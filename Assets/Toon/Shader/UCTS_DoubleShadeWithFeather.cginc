@@ -148,21 +148,22 @@
 #endif
 
 //v.2.0.4
-				float attenuation = 1;
+				float attenuation = LIGHT_ATTENUATION(i);
 #ifdef _IS_PASS_FWDBASE
                 float3 defaultLightDirection = float3(0.0,0.0001,0.00001);
 				float3 lightDirection = normalize(_WorldSpaceLightPos0.xyz + defaultLightDirection);
 				float3 lightColor = clamp(_LightColor0.rgb*0.5,0,1.5);
 				lightColor += clamp(DecodeLightProbe_Cubed(i.normalDir)*0.5,0,1);
-
 #elif _IS_PASS_FWDDELTA
                 float3 lightDirection = normalize(lerp(_WorldSpaceLightPos0.xyz, _WorldSpaceLightPos0.xyz - i.posWorld.xyz,_WorldSpaceLightPos0.w));
                 float3 lightColor = clamp(_LightColor0.rgb*0.5,0,1.5);
-                attenuation = LIGHT_ATTENUATION(i);
 #endif
                 float3 halfDirection = normalize(viewDirection+lightDirection);
 ////// Lighting:
-                float3 Set_LightColor = lightColor.rgb * attenuation;
+                float3 Set_LightColor = lightColor.rgb;
+#ifdef _IS_PASS_FWDDELTA
+				Set_LightColor *= attenuation;
+#endif
                 float3 Set_BaseColor = lerp( (_BaseColor.rgb*_BaseMap_var.rgb), ((_BaseColor.rgb*_BaseMap_var.rgb)*Set_LightColor), _Is_LightColor_Base );
                 float4 _1st_ShadeMap_var = tex2D(_1st_ShadeMap,TRANSFORM_TEX(Set_UV0, _1st_ShadeMap));
                 float3 Set_1st_ShadeColor = lerp( (_1st_ShadeColor.rgb*_1st_ShadeMap_var.rgb), ((_1st_ShadeColor.rgb*_1st_ShadeMap_var.rgb)*Set_LightColor), _Is_LightColor_1st_Shade );
