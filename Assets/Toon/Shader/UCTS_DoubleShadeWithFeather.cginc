@@ -1,4 +1,8 @@
-﻿// Upgrade NOTE: replaced '_Object2World' with 'unity_ObjectToWorld'
+﻿// Upgrade NOTE: unity_Scale shader variable was removed; replaced 'unity_Scale.w' with '1.0'
+// Upgrade NOTE: replaced '_Object2World' with 'unity_ObjectToWorld'
+// Upgrade NOTE: replaced '_World2Object' with 'unity_WorldToObject'
+
+// Upgrade NOTE: replaced '_Object2World' with 'unity_ObjectToWorld'
 
 //UCTS_DoubleShadeWithFeather.cginc
 //v.2.0.4
@@ -85,16 +89,19 @@
             uniform float _GI_Intensity;
 			//float3 grayscale_vector = float3(0, 0.3823529, 0.01845836);
 			//static const float lightClamp = 9;
-			static const float3 defaultLightDirection = float3(0.0,0.0001,0.00001);
+			static const float3 defaultLightDirection = float3(0, 1, 0);
 			static const float softGI = .95;
+			
+			// raw ambient color by direction
             fixed3 DecodeLightProbe( fixed3 N ){
 				return ShadeSH9(float4(N,1));
             }
+			
+			// ambient color smoothener
 			fixed3 DecodeLightProbe_Cubed( fixed3 N ){
 				return (1-softGI)*ShadeSH9(float4(N, 1))
-					+ (softGI+1)*ShadeSH9(float4(0,0,0,1));
+					+ (softGI)*ShadeSH9(float4(0,0,0,1));
             }
-            
 
             struct VertexInput {
                 float4 vertex : POSITION;
@@ -110,9 +117,14 @@
                 float3 tangentDir : TEXCOORD3;
                 float3 bitangentDir : TEXCOORD4;
                 LIGHTING_COORDS(5,6)
-				UNITY_FOG_COORDS(7)
+                UNITY_FOG_COORDS(7)
 				float3 vertexLighting : TEXCOORD8;
             };
+			
+	
+
+	
+//// vert			
             VertexOutput vert (VertexInput v) {
                 VertexOutput o = (VertexOutput)0;
                 o.uv0 = v.texcoord0;
@@ -132,6 +144,11 @@
 #endif
                 return o;
             }
+			
+
+			
+			
+//// frag		
             float4 frag(VertexOutput i) : SV_TARGET {
                 i.normalDir = normalize(i.normalDir);
                 float3x3 tangentTransform = float3x3( i.tangentDir, i.bitangentDir, i.normalDir);
@@ -158,44 +175,103 @@
 #elif _IS_CLIPPING_OFF
 //DoubleShadeWithFeather
 #endif
+
+
+//// Lighting:
+			/* 	//Lookup the dominant light direction using the zonal harmonic components
+				float3 worldN = i.normalDir;
+				float dx = dot(worldN, unity_SHAr.r);
+				float dy = dot(worldN, unity_SHAg.g);
+				float dz = dot(worldN, unity_SHAb.b);
+				float3 d = (float3(dx, dy, dz));
+				float3 SHdir = normalize((worldN + d) * 1); */
+		
 				float attenuation = LIGHT_ATTENUATION(i);
 				float attenRamp = (-(pow(1-attenuation, 2)) + 1);
-				//return float4(float3(1,1,1)* i.vAttenuation,1);
 				float3 lightColor = _LightColor0.rgb * attenRamp * .5;
 #ifdef _IS_PASS_FWDBASE
-				lightColor += DecodeLightProbe_Cubed(i.normalDir) * 1;
-				lightColor += i.vertexLighting * 0.1;
-				float3 lightDirection = normalize(_WorldSpaceLightPos0.xyz + defaultLightDirection);
+				//lightColor += DecodeLightProbe_Cubed(i.normalDir);
+				lightColor = max(lightColor, DecodeLightProbe_Cubed(i.normalDir));
+				lightColor = max(lightColor, i.vertexLighting * 0.1);
+				float3 lightDirection = normalize(_WorldSpaceLightPos0.xyz + defaultLightDirection * .001 );
 #elif _IS_PASS_FWDDELTA
                 float3 lightDirection = normalize(lerp(_WorldSpaceLightPos0.xyz, _WorldSpaceLightPos0.xyz - i.posWorld.xyz,_WorldSpaceLightPos0.w));
 #endif
                 float3 halfDirection = normalize(viewDirection+lightDirection);
-////// Lighting:
-                float3 Set_LightColor = lightColor.rgb;
-                float3 Set_BaseColor = lerp( (_BaseColor.rgb*_BaseMap_var.rgb), ((_BaseColor.rgb*_BaseMap_var.rgb)*Set_LightColor), _Is_LightColor_Base );
+				
+				
+				float3 Set_LightColor = lightColor.rgb;
+//// Begin textures		
+                float3 Set_BaseColor = 
+					lerp(
+						(_BaseColor.rgb*_BaseMap_var.rgb)
+						, ((_BaseColor.rgb*_BaseMap_var.rgb) * Set_LightColor)
+						, _Is_LightColor_Base 
+					);
                 float4 _1st_ShadeMap_var = tex2D(_1st_ShadeMap,TRANSFORM_TEX(Set_UV0, _1st_ShadeMap));
                 float3 Set_1st_ShadeColor = lerp( (_1st_ShadeColor.rgb*_1st_ShadeMap_var.rgb), ((_1st_ShadeColor.rgb*_1st_ShadeMap_var.rgb)*Set_LightColor), _Is_LightColor_1st_Shade );
                 float4 _2nd_ShadeMap_var = tex2D(_2nd_ShadeMap,TRANSFORM_TEX(Set_UV0, _2nd_ShadeMap));
                 float3 Set_2nd_ShadeColor = lerp( (_2nd_ShadeColor.rgb*_2nd_ShadeMap_var.rgb), ((_2nd_ShadeColor.rgb*_2nd_ShadeMap_var.rgb)*Set_LightColor), _Is_LightColor_2nd_Shade );
-                float _HalfLambert_var = 0.5*dot(lerp( i.normalDir, normalDirection, _Is_NormalMapToBase ),lightDirection)+0.5;
+                float _HalfLambert_var = 
+					0.5 
+					* 
+						dot(
+							lerp( 
+								i.normalDir
+								, normalDirection
+								, _Is_NormalMapToBase 
+							)
+							, lightDirection
+						)
+					+ 0.5;
                 float4 _Set_2nd_ShadePosition_var = tex2D(_Set_2nd_ShadePosition,TRANSFORM_TEX(Set_UV0, _Set_2nd_ShadePosition));
                 float4 _Set_1st_ShadePosition_var = tex2D(_Set_1st_ShadePosition,TRANSFORM_TEX(Set_UV0, _Set_1st_ShadePosition));
+//// Toon Ramp		
                 float Set_FinalShadowSample = 
 					saturate(
-						( 1.0 
-						+ ( (lerp( _HalfLambert_var, (_HalfLambert_var * saturate((attenuation * 0.5) + 0.5 + _Tweak_SystemShadowsLevel)), _Set_SystemShadowsToBase ) - (_BaseColor_Step - _BaseShade_Feather)) 
-							* ((1.0 - _Set_1st_ShadePosition_var.rgb).r - 1.0) ) 
-						/ (_BaseShade_Feather))
+						1.0 
+						+ 
+							(
+								(
+									lerp(
+										_HalfLambert_var
+										, (_HalfLambert_var * saturate((attenuation * 0.5) + 0.5 + _Tweak_SystemShadowsLevel))
+										, _Set_SystemShadowsToBase 
+									)
+									- (_BaseColor_Step - _BaseShade_Feather)
+								)
+								* ((1.0 - _Set_1st_ShadePosition_var.rgb).r - 1.0) 
+							) 
+						/ (_BaseShade_Feather)						
 					);
-                float3 _FinalColor_var = lerp(Set_BaseColor, 
-							lerp(Set_1st_ShadeColor,Set_2nd_ShadeColor, 
-								saturate(1.0 + 
-									(_HalfLambert_var - (_ShadeColor_Step - _1st2nd_Shades_Feather)) 
-										* ((1.0 - _Set_2nd_ShadePosition_var.rgb).r - 1.0)
-									/ (_1st2nd_Shades_Feather)))
-					, Set_FinalShadowSample); // Final Color
+//// Lerp 1st Texture Color Ramp & 2nd Toon Ramp
+                float3 _FinalColor_var = 
+					lerp(
+						Set_BaseColor
+						, 
+							lerp(
+								Set_1st_ShadeColor
+								, Set_2nd_ShadeColor
+								, 
+									saturate(
+										1.0 
+										+ (_HalfLambert_var - (_ShadeColor_Step - _1st2nd_Shades_Feather))
+										* ((1.0 - _Set_2nd_ShadePosition_var.rgb).r - 1.0) 
+										/ (_1st2nd_Shades_Feather)
+									)
+							)
+						, Set_FinalShadowSample
+					); // END Final Color
+//// High Color
                 float4 _Set_HighColorMask_var = tex2D(_Set_HighColorMask,TRANSFORM_TEX(Set_UV0, _Set_HighColorMask));
-                float _Specular_var = 0.5*dot(halfDirection,lerp( i.normalDir, normalDirection, _Is_NormalMapToHighColor ))+0.5; //  Specular
+                float _Specular_var = 
+					0.5
+					* 
+						dot(
+							halfDirection
+							, lerp( i.normalDir, normalDirection, _Is_NormalMapToHighColor )
+						)
+					+ 0.5; //  Specular
                 float _TweakHighColorMask_var = 
 					saturate((_Set_HighColorMask_var.g + _Tweak_HighColorMaskLevel))
 					* lerp(
@@ -205,17 +281,20 @@
 					);
                 float4 _HighColor_Tex_var = tex2D(_HighColor_Tex,TRANSFORM_TEX(Set_UV0, _HighColor_Tex));
                 float3 _HighColor_var = (lerp( (_HighColor_Tex_var.rgb*_HighColor.rgb), ((_HighColor_Tex_var.rgb*_HighColor.rgb)*Set_LightColor), _Is_LightColor_HighColor )*_TweakHighColorMask_var);
+//// Blend, Texture Color & High Color
                 float3 Set_HighColor = 
 					lerp(
 						max( 0, (_FinalColor_var - _TweakHighColorMask_var))
 						, _FinalColor_var
 						, _Is_BlendAddToHiColor 
 					)
-					+ lerp(
-						_HighColor_var
-						, (_HighColor_var*((1.0 - Set_FinalShadowSample)+(Set_FinalShadowSample*_TweakHighColorOnShadow)))
-						, _Is_UseTweakHighColorOnShadow 
-					);
+					+ 
+						lerp(
+							_HighColor_var
+							, (_HighColor_var*((1.0 - Set_FinalShadowSample)+(Set_FinalShadowSample*_TweakHighColorOnShadow)))
+							, _Is_UseTweakHighColorOnShadow 
+						); // End High Color
+//// Rim Color
                 float4 _Set_RimLightMask_var = tex2D(_Set_RimLightMask,TRANSFORM_TEX(Set_UV0, _Set_RimLightMask));
                 float3 _Is_LightColor_RimLight_var = lerp( _RimLightColor.rgb*attenRamp, (_RimLightColor.rgb*Set_LightColor), _Is_LightColor_RimLight );
                 float _RimArea_var = (1.0 - dot(lerp( i.normalDir, normalDirection, _Is_NormalMapToRimLight ),viewDirection));
@@ -242,8 +321,10 @@
 								- (saturate(_VertHalfLambert_var)+_Tweak_LightDirection_MaskLevel)
 							)
 						)
-						, _Add_Antipodean_RimLight );
+						, _Add_Antipodean_RimLight ); // End Rim Color
+//// Blend, (Texture & High Color) & Rim Color
                 float3 _RimLight_var = lerp( Set_HighColor, (Set_HighColor + Set_RimLight), _RimLight );
+//// Matcap				
                 float _Rot_MatCapUV_var_ang = (_Rotate_MatCapUV*3.141592654);
                 float _Rot_MatCapUV_var_spd = 1.0;
                 float _Rot_MatCapUV_var_cos = cos(_Rot_MatCapUV_var_spd*_Rot_MatCapUV_var_ang);
@@ -262,28 +343,30 @@
                 float3 Set_MatCap = 
 					lerp( _Is_LightColor_MatCap_var
 						, (_Is_LightColor_MatCap_var * ((1.0 - Set_FinalShadowSample)+(Set_FinalShadowSample * _TweakMatCapOnShadow)))
-						, _Is_UseTweakMatCapOnShadow );
+						, _Is_UseTweakMatCapOnShadow ); // End Matcap
+//// Emission
                 float4 _Emissive_Tex_var = tex2D(_Emissive_Tex,TRANSFORM_TEX(Set_UV0, _Emissive_Tex));
+//// Final Blend, (High & Rim) & Matcap & Emission				
                 float3 finalColor = 
-					(1.0 
-						- (1.0 
-							- 
-								(
-									lerp( _RimLight_var
-										, lerp( 
-											(_RimLight_var * Set_MatCap)
-											, (_RimLight_var + Set_MatCap)
-											, _Is_BlendAddToMatCap 
+					(
+							( 
+									(
+										lerp( _RimLight_var
+											, lerp( 
+												(_RimLight_var * Set_MatCap)
+												, (_RimLight_var + Set_MatCap)
+												, _Is_BlendAddToMatCap 
+											)
+											, _MatCap
 										)
-										, _MatCap
-									)
 #ifdef _IS_PASS_FWDBASE
-									+ (_Emissive_Tex_var.rgb*_Emissive_Color.rgb)
+										+ (_Emissive_Tex_var.rgb * _Emissive_Color.rgb)
 #endif								
-								)
+									)
 							)
 						//* (1.0 - (DecodeLightProbe( normalDirection ) * _GI_Intensity))
 					);
+				//finalColor = max(0, finalColor);
 
 //v.2.0.4
 #ifdef _IS_CLIPPING_OFF
