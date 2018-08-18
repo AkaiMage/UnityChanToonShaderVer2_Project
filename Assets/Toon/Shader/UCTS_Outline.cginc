@@ -32,10 +32,11 @@
 #endif
 			//static const float3 grayscale_vector = float3(0, 0.3823529, 0.01845836);
 			static const float softGI = .5;
-			
+
+			// ambient color smoothener
 			fixed3 DecodeLightProbe_Cubed( fixed3 N ){
             return (1-softGI)*ShadeSH9(float4(N, 1))
-					+ (softGI+1)*ShadeSH9(float4(0,0,0,1));
+					+ (softGI)*ShadeSH9(float4(0,0,0,1));
             }
 
             struct VertexInput {
@@ -88,14 +89,16 @@
                 return o;
             }
 			
+			
+			
             float4 frag(VertexOutput i) : SV_Target{
-				//float4 objPos = mul ( unity_ObjectToWorld, float4(0,0,0,1) );
+                //float4 objPos = mul ( unity_ObjectToWorld, float4(0,0,0,1) );
 				float attenuation = LIGHT_ATTENUATION(i);
 				float attenRamp = (-(pow(1-attenuation, 2)) + 1);
-                float4 objPos = mul ( unity_ObjectToWorld, float4(0,0,0,1) );
-                float3 lightColor = _LightColor0.rgb * attenRamp * .5;
+				float3 lightColor = _LightColor0.rgb * attenRamp * .5;
 #ifdef _IS_PASS_FWDBASE				
-				lightColor += DecodeLightProbe_Cubed(i.normalDir) * 2;
+				//lightColor += DecodeLightProbe_Cubed(i.normalDir);
+				lightColor = max(lightColor, DecodeLightProbe_Cubed(i.normalDir));
 				lightColor += i.vertexLighting*0.1;
 #endif				
                 float2 Set_UV0 = i.uv0;
