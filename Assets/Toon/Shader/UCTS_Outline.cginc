@@ -50,8 +50,13 @@
                 float2 uv0 : TEXCOORD0;
 				float3 normalDir : TEXCOORD2;
 				LIGHTING_COORDS(3,4)
-				float3 vertexLighting : TEXCOORD5;
+                UNITY_FOG_COORDS(5)
+				float3 vertexLighting : TEXCOORD6;
             };
+
+
+			
+//// vert			
             VertexOutput vert (VertexInput v) {
                 VertexOutput o = (VertexOutput)0;
                 o.uv0 = v.texcoord0;
@@ -78,7 +83,8 @@
                 Set_Outline_Width = Set_Outline_Width*2;
                 o.pos = UnityObjectToClipPos(float4(v.vertex.xyz + normalize(v.vertex)*Set_Outline_Width,1) );
 #endif
-                o.pos.z = o.pos.z + _Offset_Z * viewDirectionVP.z;
+                UNITY_TRANSFER_FOG(o,o.pos);					
+                o.pos.z = o.pos.z + _Offset_Z * viewDirectionVP.z;				
 				TRANSFER_VERTEX_TO_FRAGMENT(o);
 #ifdef VERTEXLIGHT_ON
 				o.vertexLighting = Shade4PointLights(
@@ -89,8 +95,9 @@
                 return o;
             }
 			
-			
-			
+		
+		
+//// frag			
             float4 frag(VertexOutput i) : SV_Target{
                 //float4 objPos = mul ( unity_ObjectToWorld, float4(0,0,0,1) );
 				float attenuation = LIGHT_ATTENUATION(i);
@@ -111,6 +118,7 @@
 //v.2.0.4
 #ifdef _IS_OUTLINE_CLIPPING_NO
                 float3 Set_Outline_Color = lerp(_Is_BlendBaseColor_var, _OutlineTex_var.rgb*_Is_BlendBaseColor_var, _Is_OutlineTex );
+				UNITY_APPLY_FOG(i.fogCoord, Set_Outline_Color);
                 return fixed4(Set_Outline_Color,1);
 #elif _IS_OUTLINE_CLIPPING_YES
                 float4 _ClippingMask_var = tex2D(_ClippingMask,TRANSFORM_TEX(Set_UV0, _ClippingMask));
@@ -120,7 +128,7 @@
                 float Set_Clipping = saturate((_Inverse_Clipping_var+_Clipping_Level));
                 clip(Set_Clipping - 0.5);
                 float4 Set_Outline_Color = lerp( float4(_Is_BlendBaseColor_var,Set_Clipping), float4((_OutlineTex_var.rgb*_Is_BlendBaseColor_var),Set_Clipping), _Is_OutlineTex );
-				//Set_Outline_Color.a*=.5;
+				UNITY_APPLY_FOG(i.fogCoord, Set_Outline_Color);
                 return Set_Outline_Color;
 #endif
             }

@@ -165,6 +165,7 @@
             #include "AutoLight.cginc"
 			#include "Lighting.cginc"
 			#pragma multi_compile_fwdbase_fullshadows
+            #pragma multi_compile_fog
             //#pragma fragmentoption ARB_precision_hint_fastest
             //#pragma multi_compile_shadowcaster
             //#pragma multi_compile_fog
@@ -194,6 +195,7 @@
             #include "AutoLight.cginc"
 			#include "Lighting.cginc"
 			#pragma multi_compile_fwdadd_fullshadows
+            #pragma multi_compile_fog
             //#pragma fragmentoption ARB_precision_hint_fastest
             //#pragma multi_compile_shadowcaster
             //#pragma multi_compile_fog
@@ -223,7 +225,6 @@
             #include "Lighting.cginc"
             #pragma fragmentoption ARB_precision_hint_fastest
             #pragma multi_compile_shadowcaster
-            #pragma multi_compile_fog
             #pragma only_renderers d3d9 d3d11 glcore gles gles3 metal xboxone ps4 switch
             #pragma target 3.0
             //v.2.0.4
