@@ -187,12 +187,12 @@
 				float3 SHdir = normalize((worldN + d) * 1); */
 		
 				float attenuation = LIGHT_ATTENUATION(i);
-				float attenRamp = (-(pow(1-attenuation, 2)) + 1);
-				float3 lightColor = _LightColor0.rgb * attenRamp * .5;
+				float attenRamp = saturate((-(pow(1-attenuation, 2)) + 1)+max(0,_Tweak_SystemShadowsLevel));
+				float3 lightColor = _LightColor0.rgb * attenRamp * 1;
 #ifdef _IS_PASS_FWDBASE
 				//lightColor += DecodeLightProbe_Cubed(i.normalDir);
-				lightColor = max(lightColor, DecodeLightProbe_Cubed(i.normalDir));
 				lightColor = max(lightColor, i.vertexLighting * 0.1);
+				lightColor = max(lightColor, DecodeLightProbe_Cubed(i.normalDir));
 				float3 lightDirection = normalize(_WorldSpaceLightPos0.xyz + defaultLightDirection * .001 );
 #elif _IS_PASS_FWDDELTA
                 float3 lightDirection = normalize(lerp(_WorldSpaceLightPos0.xyz, _WorldSpaceLightPos0.xyz - i.posWorld.xyz,_WorldSpaceLightPos0.w));
@@ -245,7 +245,7 @@
 						/ (_BaseShade_Feather)						
 					);
 //// Lerp 1st Texture Color Ramp & 2nd Toon Ramp
-                float3 _FinalColor_var = 
+                float3 _FinalColor_var =
 					lerp(
 						Set_BaseColor
 						, 
@@ -264,23 +264,35 @@
 					); // END Final Color
 //// High Color
                 float4 _Set_HighColorMask_var = tex2D(_Set_HighColorMask,TRANSFORM_TEX(Set_UV0, _Set_HighColorMask));
-                float _Specular_var = 
-					0.5
-					* 
-						dot(
-							halfDirection
-							, lerp( i.normalDir, normalDirection, _Is_NormalMapToHighColor )
-						)
-					+ 0.5; //  Specular
+				float _Specular_var = 
+						0.5
+						* 
+							dot(
+								halfDirection
+								, lerp( i.normalDir, normalDirection, _Is_NormalMapToHighColor )
+							)
+						+ 0.5
+					; //  Specular
                 float _TweakHighColorMask_var = 
 					saturate((_Set_HighColorMask_var.g + _Tweak_HighColorMaskLevel))
-					* lerp(
-						(1.0 - step(_Specular_var,(1.0 - _HighColor_Power)))
-						, pow(_Specular_var,exp2(lerp(11,1,_HighColor_Power)))
-						, _Is_SpecularToHighColor 
-					);
+					*
+						max(0,
+							lerp(
+								(1.0 - step(_Specular_var,(1.0 - _HighColor_Power)))
+								, pow(_Specular_var, exp2( lerp(11,1,_HighColor_Power) ))
+								, _Is_SpecularToHighColor 
+							)
+						);
                 float4 _HighColor_Tex_var = tex2D(_HighColor_Tex,TRANSFORM_TEX(Set_UV0, _HighColor_Tex));
-                float3 _HighColor_var = (lerp( (_HighColor_Tex_var.rgb*_HighColor.rgb), ((_HighColor_Tex_var.rgb*_HighColor.rgb)*Set_LightColor), _Is_LightColor_HighColor )*_TweakHighColorMask_var);
+                float3 _HighColor_var = 
+					(
+						lerp( 
+							(_HighColor_Tex_var.rgb * _HighColor.rgb)
+							, ((_HighColor_Tex_var.rgb*_HighColor.rgb) * Set_LightColor)
+							, _Is_LightColor_HighColor 
+						)
+						* _TweakHighColorMask_var
+					);
 //// Blend, Texture Color & High Color
                 float3 Set_HighColor = 
 					lerp(
@@ -309,7 +321,8 @@
 						)
 						, _LightDirection_MaskOn );
                 float _ApRimLightPower_var = pow(_RimArea_var,exp2(lerp(3,0,_Ap_RimLight_Power)));
-                float3 Set_RimLight = saturate((_Set_RimLightMask_var.g+_Tweak_RimLightMaskLevel))
+                float3 Set_RimLight = 
+					saturate((_Set_RimLightMask_var.g+_Tweak_RimLightMaskLevel))
 					* lerp( _LightDirection_MaskOn_var
 						, (_LightDirection_MaskOn_var 
 							+ lerp( _Ap_RimLightColor.rgb*attenRamp, (_Ap_RimLightColor.rgb*Set_LightColor), _Is_LightColor_Ap_RimLight )
@@ -366,7 +379,7 @@
 							)
 						//* (1.0 - (DecodeLightProbe( normalDirection ) * _GI_Intensity))
 					);
-				//finalColor = max(0, finalColor);
+					//finalColor = max(0, finalColor);
 
 //v.2.0.4
 #ifdef _IS_CLIPPING_OFF
