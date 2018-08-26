@@ -102,11 +102,11 @@
                 //float4 objPos = mul ( unity_ObjectToWorld, float4(0,0,0,1) );
 				float attenuation = LIGHT_ATTENUATION(i);
 				float attenRamp = (-(pow(1-attenuation, 2)) + 1);
-				float3 lightColor = _LightColor0.rgb * attenRamp * .5;
+				float3 lightColor = _LightColor0.rgb * attenRamp * 1;
 #ifdef _IS_PASS_FWDBASE				
 				//lightColor += DecodeLightProbe_Cubed(i.normalDir);
 				lightColor = max(lightColor, DecodeLightProbe_Cubed(i.normalDir));
-				lightColor += i.vertexLighting*0.1;
+				lightColor = max(lightColor, i.vertexLighting * 0.1);
 #endif				
                 float2 Set_UV0 = i.uv0;
                 float4 _BaseMap_var = tex2D(_BaseMap,TRANSFORM_TEX(Set_UV0, _BaseMap));
