@@ -21,8 +21,29 @@
 			uniform fixed _Inverse_Clipping;
 			uniform fixed _IsBaseMapAlphaAsClippingMask;
 #endif
-			//static const float3 grayscale_vector = float3(0, 0.3823529, 0.01845836);
+			uniform int _outline_mode;
 			static const float softGI = .5;
+
+
+
+			struct VertexInput {
+				float4 vertex : POSITION;
+				float3 normal : NORMAL;
+				float2 texcoord0 : TEXCOORD0;
+			};
+			struct VertexOutput {
+				float4 pos : SV_POSITION;
+				float4 posWorld : TEXCOORD1;
+				float2 uv0 : TEXCOORD0;
+				float3 normalDir : TEXCOORD2;
+				UNITY_SHADOW_COORDS(3)
+				// LIGHTING_COORDS(3,4)
+				UNITY_FOG_COORDS(5)
+				half3 vertexLighting : COLOR0;
+				half attenVert : COLOR1;
+			};
+
+
 
 			// ambient color
 			fixed3 DecodeLightProbe_average( fixed3 N ){
@@ -70,21 +91,14 @@
 				return col;
 			}
 
-			struct VertexInput {
-				float4 vertex : POSITION;
-				float3 normal : NORMAL;
-				float2 texcoord0 : TEXCOORD0;
-			};
-			struct VertexOutput {
-				float4 pos : SV_POSITION;
-				float4 posWorld : TEXCOORD1;
-				float2 uv0 : TEXCOORD0;
-				float3 normalDir : TEXCOORD2;
-				LIGHTING_COORDS(3,4)
-				UNITY_FOG_COORDS(5)
-				half3 vertexLighting : COLOR0;
-				half attenVert : COLOR1;
-			};
+
+
+
+
+
+
+
+
 
 
 
@@ -94,8 +108,9 @@
 				o.uv0						= v.texcoord0;
 				o.normalDir					= UnityObjectToWorldNormal( v.normal);
 				o.posWorld					= mul( unity_ObjectToWorld, v.vertex);
+
 				float4 objPos				= mul ( unity_ObjectToWorld, float4(0,0,0,1) );
-				float3 lightColor			= _LightColor0.rgb;
+
 				float2 Set_UV0				= o.uv0;
 				float4 _Outline_Sampler_var	= tex2Dlod( _Outline_Sampler, float4( TRANSFORM_TEX( Set_UV0, _Outline_Sampler), 0.0, 0));
 				float Set_Outline_Width		= 
@@ -114,14 +129,28 @@
 #else
 				_Offset_Z = _Offset_Z * 0.01;
 #endif
-#ifdef _OUTLINE_NML
-				o.pos					= UnityObjectToClipPos( float4( v.vertex.xyz + v.normal * Set_Outline_Width, 1) );
-#elif _OUTLINE_POS
-				Set_Outline_Width		= Set_Outline_Width * 2;
-				o.pos					= UnityObjectToClipPos( float4( v.vertex.xyz + normalize(v.vertex) * Set_Outline_Width, 1) );
-#endif
+
+				// NML
+				if (_outline_mode == 0){
+					o.pos					= UnityObjectToClipPos( float4( v.vertex.xyz + v.normal * Set_Outline_Width, 1) );
+				}
+				// POS
+				else if (_outline_mode == 1){
+					Set_Outline_Width		= Set_Outline_Width * 2;
+					o.pos					= UnityObjectToClipPos( float4( v.vertex.xyz + normalize(v.vertex) * Set_Outline_Width, 1) );
+				}
+
+// #ifdef _OUTLINE_NML
+// 				o.pos					= UnityObjectToClipPos( float4( v.vertex.xyz + v.normal * Set_Outline_Width, 1) );
+
+// #elif _OUTLINE_POS
+// 				Set_Outline_Width		= Set_Outline_Width * 2;
+// 				o.pos					= UnityObjectToClipPos( float4( v.vertex.xyz + normalize(v.vertex) * Set_Outline_Width, 1) );
+// #endif
+
 				UNITY_TRANSFER_FOG( o, o.pos);
-				TRANSFER_VERTEX_TO_FRAGMENT(o);
+				UNITY_TRANSFER_SHADOW(o, o.uv0);
+				// TRANSFER_VERTEX_TO_FRAGMENT(o);
 				o.pos.z					= o.pos.z + _Offset_Z * viewDirectionVP.z;
 #ifdef VERTEXLIGHT_ON
 				o.vertexLighting		= softShade4PointLights_Atten(
@@ -183,13 +212,14 @@
 
 
 
-#ifdef _IS_PASS_FWDBASE
+#ifdef UNITY_PASS_FORWARDBASE
 				float3 lightColor		= _LightColor0.rgb;
 				float shadowBlackness	= max(_OutlineshadowCastMin_black, shadowAttenB);
 				float3 ambientLight		= DecodeLightProbe_average( i.normalDir);
 				lightColor				= lightColor * shadowBlackness * attenRamp;
 				lightColor				= (lightColor + ambientLight) + (i.vertexLighting * i.attenVert);
-#elif _IS_PASS_FWDDELTA
+
+#elif UNITY_PASS_FORWARDADD
 				float shadRings			= shadowAttenB;
 				float shadowBlackness	= max(_OutlineshadowCastMin_black, shadowAttenB);
 				float3 lightColor		= _LightColor0.rgb;
@@ -197,18 +227,26 @@
 				lightColor				= lightColor * shadBlackScale * attenRamp;
 #endif
 
+				// fight how the raw light of direct + indirect overbrights
+				// Ill change this counter many time more than now. Which is to many already!
+				float3 Set_LightColor	= lightColor;
+				Set_LightColor.x	= (Set_LightColor.x > 1) ? sqrt(Set_LightColor.x) : Set_LightColor.x;
+				Set_LightColor.y	= (Set_LightColor.y > 1) ? sqrt(Set_LightColor.y) : Set_LightColor.y;
+				Set_LightColor.z	= (Set_LightColor.z > 1) ? sqrt(Set_LightColor.z) : Set_LightColor.z;
+
 
 
 				float2 Set_UV0					= i.uv0;
 				float4 _MainTex_var				= tex2D(_MainTex, TRANSFORM_TEX( Set_UV0, _MainTex));
 				float3 _BaseColorMap_var		= ( _Color.rgb * _MainTex_var.rgb );
-				float3 Set_BaseColor			= lerp( _BaseColorMap_var * lightColor, (_BaseColorMap_var * lightColor.rgb), _Is_LightColor_Base );			
-				float3 _Is_BlendBaseColor_var	= lerp( (_Outline_Color.rgb * lightColor.rgb), (_Outline_Color.rgb * Set_BaseColor), _Is_BlendBaseColor );
+				float3 Set_BaseColor			= lerp( _BaseColorMap_var * Set_LightColor, (_BaseColorMap_var * Set_LightColor.rgb), _Is_LightColor_Base );			
+				float3 _Is_BlendBaseColor_var	= lerp( (_Outline_Color.rgb * Set_LightColor.rgb), (_Outline_Color.rgb * Set_BaseColor), _Is_BlendBaseColor );
 				float3 _OutlineTex_var			= tex2D( _OutlineTex, TRANSFORM_TEX( Set_UV0, _OutlineTex));
 #ifdef _IS_OUTLINE_CLIPPING_NO
 				float3 Set_Outline_Color		= lerp( _Is_BlendBaseColor_var, _OutlineTex_var.rgb * _Is_BlendBaseColor_var, _Is_OutlineTex );
 				UNITY_APPLY_FOG( i.fogCoord, Set_Outline_Color);
 				return fixed4(Set_Outline_Color, 1);
+
 #elif _IS_OUTLINE_CLIPPING_YES
 				float4 _ClippingMask_var				= tex2D( _ClippingMask, TRANSFORM_TEX( Set_UV0, _ClippingMask));
 				float Set_MainTexAlpha					= _MainTex_var.a;

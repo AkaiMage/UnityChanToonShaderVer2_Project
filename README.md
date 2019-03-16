@@ -27,9 +27,10 @@ My UTS branch is its own separate fork. I have my own methods to approach UNITY 
 To those in the vrchat shader community, Thank you all. After all my study and dumb questions towards acquaintances and friends i got UTS to look right in vrchat! I hope to author my own original toon shader someday, but because how much i like UTS approch i'll likely see myself  improving aspects of UTS until its barely recognisable. 
  
 
-In regards to improvements i will accept code contribution as pull requests! If you see something to improve pass me the bug fix for my fork (please use git so your work is recorded in the system!).  I will stick to github and git methodology so everything is recorded and easy to manage as shader community that wants to contribute to my project.
 
-I believe UTS is one of the best approaches to toon shading with its effects, it takes the artists' toon ramps and painting, shines, rims, and macaps and does the least random realistic and color tinting so what the artists wants they get, as well as options to disobey unity's light model if they feel evil!  
+In regards to improvements i will accept code contribution as pull requests! If you see something to improve pass me the bug fix for my fork (please use git so your work is recorded in the system!).  I will stick to github and git methodology so everything is recorded and managed.
+
+I believe UTS is one of the best approaches to toon shading with its effects, it takes the artists' toon ramps and painting, shines, rims, and matcaps and does the least random realistic and color tinting so what the artists wants they get, as well as options to disobey unity's light model if they feel evil!  
 
 Today mainline UTS has moved forward to v2.0.5+ and this little side branch of mine was for v2.0.4+. It should be possible to swap other version of UTS2 with mine for a while. 
 
@@ -53,8 +54,47 @@ You may have to set the new stencil options to correct defaults. Set the zwrite 
 
 
 
+# Shader setup: 
+UTS is a very technical and manual shader compared to other toon shaders. The freedom comes with the energy cost of needing to manually balance every color aspect in the settings and how easy to do it wrong by color balance.
+
+Always read and follow the documentation for UTS2.
+See the latest mainline UTS2 release manual, it contain videos and examples of setup:
+
+https://github.com/unity3d-jp/UnityChanToonShaderVer2_Project/blob/master/Manual/
+https://github.com/unity3d-jp/UnityChanToonShaderVer2_Project 
+
+Note my fork is different from the mainline readme version but the great effort of unity3d-jp is admirable and helps everyone.
+
+
+
+
+
+
+# Shader keywords limit notes and solutions for avatar creators and shader writers.
+A common problem to all vrchat shaders is sharing the limited space of shader keywords. Roughly speaking, this is a set of unity defines to decide what code paths to follow from compiled variations. Keywords only affect the shader that needs it but share a superset of defines for some strange reason. There is a limited array of keyword spaces that cannot be managed in engine currently, the set is first-come-first-serve from game launch.
+
+The keyword space can also be flooded in your unity project. It's a good reason to clean out scene materials you dont want. Assets not used should not count.
+
+
+For the end user (you the avatar creator) in vrchat there is a way to clean up unused keywords retroactively between shader changes and updates!
+
+Select your material -> set to debug by using the drop down right of the inspector tab row -> read out the keywords test box and test deleting that list. If that material looks ok after you are lucky. You may also start a new materiel if you accept losing your settings.
+
+For UTS2 you may delete this keyword list.
+
+
+
+For shader writers, avoid methods that depend on #ifdef or create keywords. 
+
+See how i have implemented [toggle(_)] for toggles and number enum, and see how defines are limited. For toggles, use the float value of [0, 1] in your code to decide path flow or use a lerp(offValue, onValle, boolToggle) setup. 
+
+
+
+
+
+
 # Features and some forks differences.
-To help reduce confusion understanding UTS for beginners I will do my best to explain common confusion in this readme. The Entirety is documented in the manual which is linked and provided. This  exists to help paraphrase the massive details in the official UTS2 manual and what i know people have struggled with.
+To help reduce confusion understanding UTS for beginners I will do my best to explain common confusion. The entirety is documented in the manual which is linked and provided. This  exists to help paraphrase the massive details in the official UTS2 manual and what i know people have struggled with.
 
 
 
@@ -63,10 +103,6 @@ UTS has a number of effects, in some order:
 
 
 * Face _CullMode, if faces render both/back/forward.
-
-
-
-* Effects are prefaced with "LightColor" switches, this switches the light model from world color following on or presudo unlit light & shadow attenuate as color off.
 
 
 
@@ -85,8 +121,11 @@ UTS has a number of effects, in some order:
   * For artistic and natural looking toon shading tones give it saturation and avoid gray tones. Tint the shadows in blue or red or a mix, and for light receiving side tint the effects towards yellow. When setting up UTS's shadow  albedo textures, instead of using a dark gray multiplier compliment it with a custom shadow albedo texture: copy and save your texture in photoshop or GIMP and increase the saturate about 5-15% and then set that onto the shade N textures. Its like a lazy and fast way to make shadows look more vibrant and in these ways you fake light "bouncing" and its good for skin shading.
   * There is a minimal shadow blackness setting to reduce shadow casts on the model. I recommend using this as a toggle if you find yourself incorrectly lit in some vrchat maps. You will disobey UNITYs light model with this slider and become partly unlit as sacrifice. Its better to go to a correctly lit map.
 
+  
+  
 * My custom shadow cast and falloff system.
   * I have customized unity's shadow casts system to behave uniquely in this UTS2 fork. I have separated the "light attenuation" from the "shadow attenuation" and can mix and override dynamic lights with separate light falloff values and shadow darkness values. 
+  * shadow casts now have a saturation setting. Use values > 1 to make surfaces look nicer in the dark, such as skin. Default: 0.5.
   * My goal is balances unity's shadow casts to they integrate into UTS's ramps and give the control to the artist; Well also allowing functional direct shadows casts, to make an avatar black when the world intends such black shadows such as a "space" setting.
     * Use the "Tweak_SystemShadowsLevel" slider to adjust shadow cast sensitivity to toon change. Hopefully one direction is sharper and other is softer. 
 	  * New is this now smoothly remaps only shadow casts of any strength into using the dark toon ramp tones before true black shadows reach complete blackness.
@@ -97,6 +136,7 @@ UTS has a number of effects, in some order:
   * Expect improvements as i dig deeper into unity's light cast system and attempt to modernize shadow casting for toon effects.
 
 
+  
 *  highColor. The Toon shine effect.
   * This effect is how you enable light direction shine, to enable it, pick a color instead of black and raise the _HighColor_Power slider.
   * Mixing has two modes: replace or add. Either case you should assign your albedo texture and color, or a custom painted albedo that looks what you want the shine to be, eg) sharp shiny corners of robots, a custom color for shiny velvet cloths that tints in many ways.
@@ -106,6 +146,8 @@ UTS has a number of effects, in some order:
   * Use highColor for where you want to express shininess or metallic surfaces.
   * There is a mask texture for highColor.
 
+  
+  
 * The RimLight. 
   * UTS rim setup is extensive and maybe overboard but unique to UTS2. When enabled you gain settings of strength, cutoff, intensity, if it's hard or soft, or the directionality to light sources. 
   * There is a anti rim light, Antipodean_RimLight, that works in opposite direction to rim. Use it to emulate light penetrating and moving under a surface or as artistic counter color to the main rim color. 
@@ -127,6 +169,9 @@ UTS has a number of effects, in some order:
 * Emission.  Fairly standard, a mask and color pick.
 
 
+* TheEffects are prefaced with "LightColor" switches, thies switches the light model from world color following or presudo unlit when off. Used to override base brightness of effects.
+
+
 
 * Outlines. In concept, outlines change thickness by distance to camera. You adjust the near and far range in object space (so it scales to the object size regardless of world space rescale)
   * to set static outline size, set min and max distance equal.
@@ -138,7 +183,19 @@ UTS has a number of effects, in some order:
 
 
 
-* Stencil are all combine into a list. 
+* Stencil settings are all combined into a list. 
+  * NOTICE: Feature is incomplete and i unforeseen something, here is the workaround. Stencil require two shaders with different queue order, the "hair" (the out) shader must render after the "eye" (the mask) in relative.
+    You would have to duplicate either the "eye" or "hair" shader and offset the queue between them by >= 1.
+     * To for example, copy the shader you mark as "eye", rename the file with a tag and also change the first line "Shader " with a matching name in that path, as so:
+	 
+	    "UnityChanToonShader/ACiiL/NoOutline/[your matching rename]" { ....
+		
+     * Then goto the subshader tag line and look for queue, append an offset number like "- 1" for eyes, OR only "+ 1" for hair, as so:
+	 
+	    SubShader {		Tags { "Queue"="[whatever the queue type] - 1" ....
+	 
+	 * Sorry everyone. If i include these edits the project size would bloat again.
+		
   * Default stencils in listing order: 0, 0, 255, 255; 0, 0 , 0 ,0; 1, 4, 15. In respective properties.
   * Zwrite off may give strange invisible appearance. Default on unless you want pass threw alphas.
   * These properties came from my shader friends samples and dramatically shrunk the shader files count!
@@ -164,24 +221,12 @@ UTS has a number of effects, in some order:
 
 
 
-# Shader setup: 
-UTS is a very technical and manual shader compared to other toon shaders. The freedom comes with the risk of needing to manually balance every color aspect in the settings and how easy to do it wrong by color balance.
 
-
-Always read and follow the documentation for UTS found in this zip and read updated files and videos found at:
-
-https://github.com/unity3d-jp/UnityChanToonShaderVer2_Project 
-
-
-The latest mainline UTS2 release manual:
-
-https://github.com/unity3d-jp/UnityChanToonShaderVer2_Project/blob/master/Manual/
-
-Note my fork is different from the mainline readme version but the great effort of unity3d-jp is admirable and helps everyone.
 
 
 
 # Shader file usage and render error avoidances.
+
 Start by using the no-outlines version for best performance (outlines are extra passes. So i typically use it for non alpha or skin effects).
 Your default shader is: ToonColor_DoubleShadeWithFeather.
 Your clipping shader is: ToonColor_DoubleShadeWithFeather_ClippingCutout.
@@ -191,20 +236,24 @@ It should be obvious which is Clipping, Fade, and Transparency.
 
 To setup alpha and clipping together, use TransClippingFade for transparency that needs shadows (Transparent never receives shadow casts). See the features guide above for settings.
 
-Limitations of alpha. 
-Note the recommended alpha shader ToonColor_DoubleShadeWithFeather_TransClippingFade.shader has its own issues by how its implemented and how limited unity is rendering transparency. In reality its alphaTest (clip) mode and misusing the alpha channel. You will have z sorting issues when this shader overlays other alphaTest shaders. The sorting issue cannot be differed by changing the render queue as that creates a inner-shader conflict when overlaying the same alphaTest shader many times, or depend on exclusive queue ordering with your friends alpha shaders. 
 
-The true transparency shader will not have z sorting issues, but true transparency mode makes unity never pass receive shadow casts, thus UTS attempts to respect the unity lighting model for direct lights (shadow casting) is disobeyed. The compromise will make you want to set the shaders to unlit to be consistent.
+
+Limitations of alpha. 
+Note the recommended alpha shader ToonColor_DoubleShadeWithFeather_TransClippingFade.shader has its own issues by how its implemented and how limited unity is rendering transparency. In reality its alphaTest (clip) mode and misusing the alpha channel, which many shaders use to counter unity's transparency limitations. You will have z sorting issues when this alphaTest overlays other alphaTest shaders. The sorting issue cannot be differed by changing the render queue as that creates a inner-shader conflict when overlaying the same alphaTest shader many times, or depend on exclusive queue ordering with your friends alpha shaders. 
+
+The true transparency shader will not have z sorting issues, but true transparency mode makes unity never pass receive shadow casts, thus UTS's attempts to respect the unity lighting model for direct lights  shadows (shadow receiving) is off. The compromise will make you want to set the shaders to unlit to be consistent.
 
 I plan to implement dithered transparency which is a compromise between receiving shadows, alpha, and z sorting.
 
 
-Color balances and bloom problems.
+
+Color balances and bloom solutions.
 I recommend installing the unity post processing stack in your avatar scene with bloom on and track when bloom is too strong with a default directional light and with some extra default dynamic lights and/or baked lighting. Bloom happen when HRD color values goes higher than 1.1, and you should know many maps like to push lights above this value in vrchat!
 
 UTS is sensitive to white albeto textures and maps that have strong direct and indirect colors. Counter the quick bloom out by using a gray base color, about 80% and lower the other color effects too. Anticipate whites in albedo will bloom before blacks, you may counter this with a inverted color gray mask that dim effects on the whites.
 
 To control HDR and bloom, when picking each effects color in UTS, balance color illumination (V) when combining albedo, highColor, outlines, anti-outline, and additive matcap. Note that these effects stack and mix with: replace, add, or multiply and may push the final color into emission range. The future way to fix these effects and albeto sensitivity is rebuilding the effects with constrictive PBR math rules.
+
 
 
 Outlines issues. Please default your outline color to mid gray and balance from there for contrast. Please Use outlines with Opaque mode only, outline ztest does not look right with transparent models.
@@ -226,6 +275,10 @@ Vrchat map authors must balance maps with the standard shader: Begin by using tw
 For maps where standard shader avatars looks fine and UTS does not i will be interested in debugging. Provide me with the map name and author to visit. Odds are the map is using: An unlit shader with a default directional light and shadow and an ambient blue, a point/spot light far in the distance as a sun cast, or setup eye-adaptation for common toon  shaders that clamp light intensity to (0,1) instead of full range (0, infinity).
 
 Outlines have an outstanding shadow cast bug from the base-pass directional light which all shadows bleed behind the outlines, and correct for add-pass lights (spot/point/etc). Fixing this may require an entire rewrite of the pass-based outlines into geometry and i need to study geometry shaders for that. Basically special shadow caster depth data is needed for outlines which are further out than the base passes of the body, which seems direction lights fail to capture.
+
+Stencil currently requires manual file editing. Please see the stencil category above for how to do that. Sorry.
+
+Is you model pure black when you apply UTS2 ? Default your model import settings. You want unity to calculate tangent normals.
 
 
 

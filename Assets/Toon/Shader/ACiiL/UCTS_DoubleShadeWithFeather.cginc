@@ -68,8 +68,8 @@
 			uniform float4 _Emissive_Color;
 			uniform float _shadowCastMin_black;
 
-
-
+			uniform float _testMix;
+			uniform float _shaSatRatio;
 
 
 
@@ -108,10 +108,12 @@
 				float3 tangentDir : TEXCOORD3;
 				float3 bitangentDir : TEXCOORD4;
 				float3 GIdirection : COLOR0;
-				LIGHTING_COORDS(5,6)
+				UNITY_SHADOW_COORDS(5)
+				// LIGHTING_COORDS(5,6)
 				UNITY_FOG_COORDS(7)
 				half3 vertexLighting : COLOR1;
 				half attenVert : COLOR2;
+				float4 center : COLOR3;
 			};
 
 
@@ -125,6 +127,12 @@
 			fixed3 DecodeLightProbe_average( fixed3 N ){
 				//return (1 - softGI) * ShadeSH9( float4(N, 1)) + (softGI) * ShadeSH9( float4(0,0,0,1));
 				return ShadeSH9( float4(0,0,0,1));
+			}
+
+			// Merlin's post. Shader community
+			bool IsInMirror()
+			{
+				return unity_CameraProjection[2][0] != 0.f || unity_CameraProjection[2][1] != 0.f;
 			}
 
 			// Neitri's Help
@@ -233,8 +241,6 @@
 				return dot(d, float4(52.0,52.0,52.0,52.0));
 			} */
 
-
-
 			//
 			float3 StereoWorldViewPos( float3 worldPos ) {
 #if UNITY_SINGLE_PASS_STEREO
@@ -253,6 +259,24 @@
 				return worldViewDir;
 			}
 
+			//
+			float3 HSVToRGB( float3 c )
+			{
+				float4 K	= float4( 1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0 );
+				float3 p	= abs( frac( c.xxx + K.xyz ) * 6.0 - K.www );
+				return c.z * lerp( K.xxx, saturate( p - K.xxx ), c.y );
+			}
+
+			//
+			float3 RGBToHSV(float3 c)
+			{
+				float4 K	= float4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+				float4 p	= lerp( float4( c.bg, K.wz ), float4( c.gb, K.xy ), step( c.b, c.g ) );
+				float4 q	= lerp( float4( p.xyw, c.r ), float4( c.r, p.yzx ), step( p.x, c.r ) );
+				float d		= q.x - min( q.w, q.y );
+				float e		= 1.0e-10;
+				return float3( abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+			}
 
 
 
@@ -274,15 +298,17 @@
 				o.bitangentDir			= normalize( cross( o.normalDir, o.tangentDir) * v.tangent.w);
 				o.posWorld				= mul( unity_ObjectToWorld, v.vertex);
 				o.pos					= UnityObjectToClipPos( v.vertex );
+				o.center				= mul( unity_ObjectToWorld, float4(0,0,0,1));
 				UNITY_TRANSFER_FOG(o, o.pos);
-				TRANSFER_VERTEX_TO_FRAGMENT(o);
+				UNITY_TRANSFER_SHADOW(o, o.uv0);
+				// TRANSFER_VERTEX_TO_FRAGMENT(o);
 #ifdef VERTEXLIGHT_ON
 				o.vertexLighting		= softShade4PointLights_Atten(
 					unity_4LightPosX0, unity_4LightPosY0, unity_4LightPosZ0
 					, unity_LightColor[0], unity_LightColor[1], unity_LightColor[2], unity_LightColor[3]
 					, unity_4LightAtten0, o.posWorld, o.normalDir, o.attenVert);
 #endif					
-#ifdef _IS_PASS_FWDBASE
+#ifdef UNITY_PASS_FORWARDBASE
 				o.GIdirection			= GIsonarDirection();
 #endif
 				return o;
@@ -296,26 +322,34 @@
 //// frag
 			float4 frag(VertexOutput i) : SV_TARGET {
 				i.normalDir					= normalize( i.normalDir);
-				float3x3 tangentTransform	= float3x3( i.tangentDir, i.bitangentDir, i.normalDir);
-				//float3 viewDirection		= normalize( _WorldSpaceCameraPos.xyz - i.posWorld.xyz);
 				float3 worldviewPos			= StereoWorldViewPos(i.posWorld.xyz);
 				float3 viewDirection		= normalize(worldviewPos - i.posWorld.xyz);
+
+
+				// normal map
 				float2 Set_UV0				= i.uv0;
-				float4 _MainTex_var			= tex2D( _MainTex, TRANSFORM_TEX( Set_UV0, _MainTex));
 				float3 _NormalMap_var 		= UnpackNormal( tex2D( _NormalMap, TRANSFORM_TEX( Set_UV0, _NormalMap)));
 				float3 normalLocal			= _NormalMap_var.rgb;
+				float3x3 tangentTransform	= float3x3( i.tangentDir, i.bitangentDir, i.normalDir);
 				float3 normalDirection		= normalize( mul( normalLocal, tangentTransform )); // Perturbed normals
+
+
+				// towards cam dot
 				float _FaceFwdDot			= dot( i.normalDir, viewDirection);
 
 
 
+//// albedo texure
+				// base albedo
+				float4 _MainTex_var			= tex2D( _MainTex, TRANSFORM_TEX( Set_UV0, _MainTex));
 
-
+				// clip & alpha handling. Here now so clip() may interrupt flow.
 #ifdef _IS_CLIPPING_MODE
 				//DoubleShadeWithFeather_Clipping
 				float4 _ClippingMask_var	= tex2D(_ClippingMask, TRANSFORM_TEX( Set_UV0, _ClippingMask));
 				float Set_Clipping			= saturate( (lerp( _ClippingMask_var.r, (1.0 - _ClippingMask_var.r), _Inverse_Clipping ) + _Clipping_Level));
 				clip(Set_Clipping - 0.5);
+
 #elif _IS_CLIPPING_TRANSMODE
 				//DoubleShadeWithFeather_TransClipping
 				float4 _ClippingMask_var				= tex2D( _ClippingMask, TRANSFORM_TEX(Set_UV0, _ClippingMask));
@@ -324,9 +358,14 @@
 				float _Inverse_Clipping_var				= lerp( _IsBaseMapAlphaAsClippingMask_var, (1.0 - _IsBaseMapAlphaAsClippingMask_var), _Inverse_Clipping );
 				float Set_Clipping						= saturate( (_Inverse_Clipping_var + _Clipping_Level));
 				clip(Set_Clipping - 0.5);
+
 #elif _IS_CLIPPING_OFF
 				//DoubleShadeWithFeather
 #endif
+
+				// albedo shade 1 & 2
+				float4 _1st_ShadeMap_var	= tex2D( _1st_ShadeMap, TRANSFORM_TEX( Set_UV0, _1st_ShadeMap));
+				float4 _2nd_ShadeMap_var	= tex2D( _2nd_ShadeMap, TRANSFORM_TEX( Set_UV0, _2nd_ShadeMap));
 
 
 
@@ -334,34 +373,34 @@
 
 
 //// Redefine UNITY_LIGHT_ATTENUATION without shadow multiply from AutoLight.cginc
-#ifdef POINT
-#define UNITY_LIGHT_ATTENUATION_NOSHADOW(destName, input, worldPos) \
-	unityShadowCoord3 lightCoord = mul(unity_WorldToLight, unityShadowCoord4(worldPos, 1)).xyz; \
-	fixed destName = tex2D(_LightTexture0, dot(lightCoord, lightCoord).rr).UNITY_ATTEN_CHANNEL;
-#endif
+				#ifdef POINT
+				#define UNITY_LIGHT_ATTENUATION_NOSHADOW(destName, input, worldPos) \
+					unityShadowCoord3 lightCoord = mul(unity_WorldToLight, unityShadowCoord4(worldPos, 1)).xyz; \
+					fixed destName = tex2D(_LightTexture0, dot(lightCoord, lightCoord).rr).UNITY_ATTEN_CHANNEL;
+				#endif
 
-#ifdef SPOT
-#define UNITY_LIGHT_ATTENUATION_NOSHADOW(destName, input, worldPos) \
-	unityShadowCoord4 lightCoord = mul(unity_WorldToLight, unityShadowCoord4(worldPos, 1)); \
-	fixed destName = (lightCoord.z > 0) * UnitySpotCookie(lightCoord) * UnitySpotAttenuate(lightCoord.xyz);
-#endif
+				#ifdef SPOT
+				#define UNITY_LIGHT_ATTENUATION_NOSHADOW(destName, input, worldPos) \
+					unityShadowCoord4 lightCoord = mul(unity_WorldToLight, unityShadowCoord4(worldPos, 1)); \
+					fixed destName = (lightCoord.z > 0) * UnitySpotCookie(lightCoord) * UnitySpotAttenuate(lightCoord.xyz);
+				#endif
 
-#ifdef DIRECTIONAL
-#define UNITY_LIGHT_ATTENUATION_NOSHADOW(destName, input, worldPos) fixed destName = 1;
-// #define UNITY_LIGHT_ATTENUATION_NOSHADOW(destName, input, worldPos) fixed destName = UNITY_SHADOW_ATTENUATION(input, worldPos);
-#endif
+				#ifdef DIRECTIONAL
+				#define UNITY_LIGHT_ATTENUATION_NOSHADOW(destName, input, worldPos) fixed destName = 1;
+				// #define UNITY_LIGHT_ATTENUATION_NOSHADOW(destName, input, worldPos) fixed destName = UNITY_SHADOW_ATTENUATION(input, worldPos);
+				#endif
 
-#ifdef POINT_COOKIE
-#define UNITY_LIGHT_ATTENUATION_NOSHADOW(destName, input, worldPos) \
-	unityShadowCoord3 lightCoord = mul(unity_WorldToLight, unityShadowCoord4(worldPos, 1)).xyz; \
-	fixed destName = tex2D(_LightTextureB0, dot(lightCoord, lightCoord).rr).UNITY_ATTEN_CHANNEL * texCUBE(_LightTexture0, lightCoord).w;
-#endif
+				#ifdef POINT_COOKIE
+				#define UNITY_LIGHT_ATTENUATION_NOSHADOW(destName, input, worldPos) \
+					unityShadowCoord3 lightCoord = mul(unity_WorldToLight, unityShadowCoord4(worldPos, 1)).xyz; \
+					fixed destName = tex2D(_LightTextureB0, dot(lightCoord, lightCoord).rr).UNITY_ATTEN_CHANNEL * texCUBE(_LightTexture0, lightCoord).w;
+				#endif
 
-#ifdef DIRECTIONAL_COOKIE
-#define UNITY_LIGHT_ATTENUATION_NOSHADOW(destName, input, worldPos) \
-	unityShadowCoord2 lightCoord = mul(unity_WorldToLight, unityShadowCoord4(worldPos, 1)).xy; \
-	fixed destName = tex2D(_LightTexture0, lightCoord).w;
-#endif
+				#ifdef DIRECTIONAL_COOKIE
+				#define UNITY_LIGHT_ATTENUATION_NOSHADOW(destName, input, worldPos) \
+					unityShadowCoord2 lightCoord = mul(unity_WorldToLight, unityShadowCoord4(worldPos, 1)).xy; \
+					fixed destName = tex2D(_LightTexture0, lightCoord).w;
+				#endif
 
 
 
@@ -369,9 +408,20 @@
 
 
 //// Light attenuation and direction:
+
+// testing shadow sample offsets
+/*
+				float3 sOffset			= (i.posWorld.xyz - i.center) * sin(_Time.y * UNITY_PI ) ;
+// return float4(sOffset.xyz,1);
+				float yOffset			= sin(_Time.y * UNITY_PI ) * float3(0,1,0);
+				float shadowAtten		= UNITY_SHADOW_ATTENUATION(i, sOffset + i.center);
+*/
+
 				UNITY_LIGHT_ATTENUATION_NOSHADOW(lightAtten, i, i.posWorld.xyz);
 				float shadowAtten		= UNITY_SHADOW_ATTENUATION(i, i.posWorld.xyz);
 				shadowAtten				= max(shadowAtten, i.attenVert);
+				// float attenRampB		= lightAtten;
+				// float shadowAttenB			= shadowAtten;
 				float nLightAtten		= 1 - lightAtten;
 				float nShadowAtten		= 1 - shadowAtten;
 				float attenRampB		= ( (-(nLightAtten * nLightAtten) + 1));
@@ -380,10 +430,10 @@
 
 
 
-#ifdef _IS_PASS_FWDBASE
+#ifdef UNITY_PASS_FORWARDBASE
 				float3 cameraLightDirection	= normalize( UNITY_MATRIX_V[2].xyz + UNITY_MATRIX_V[1].xyz);
 				float3 lightDirection		= normalize( _WorldSpaceLightPos0.xyz + (i.GIdirection) * .01 + cameraLightDirection *.0001);
-#elif _IS_PASS_FWDDELTA
+#elif UNITY_PASS_FORWARDADD
 				float3 lightDirection	= 
 					normalize( 
 						lerp( 
@@ -397,6 +447,84 @@
 
 
 
+
+//// Mix light input colors
+				//const half shadowRings			= .15;
+#ifdef UNITY_PASS_FORWARDBASE
+				//float shadRings		= (ceil( shadowAttenB / shadowRings) * (shadowRings));
+				float shadRings			= shadowAttenB;
+				float3 lightIndirect	= DecodeLightProbe_average( i.normalDir);
+				float3 lightDirect		= _LightColor0.rgb;
+				float shadowBlackness	= max(_shadowCastMin_black, shadRings);
+				float shaBlackMix		= shadowBlackness * attenRamp;
+				lightDirect				= lightDirect * shaBlackMix;
+
+				// fuzzy logic for classifying direct light < indirect light
+				float lightDirGray		=  dot(_LightColor0.rgb,	1) / 3;
+				float lightInDirGray	=  dot(lightIndirect.rgb,	1) / 3;
+				float colorIntSignal	= (smoothstep(0, lightDirGray, lightInDirGray));
+				// float3 colorIntSignal	= (smoothstep(0, _LightColor0.rgb, lightIndirect));
+
+				float3 lightColorFinal	= (lightDirect + lightIndirect) + (i.vertexLighting * i.attenVert);
+
+#elif UNITY_PASS_FORWARDADD
+				//float shadRings		= ceil( shadowAttenB / shadowRings) * shadowRings;
+				float shadRings			= shadowAttenB;
+				float3 lightDirect		= _LightColor0.rgb;
+				float shadowBlackness	= max(_shadowCastMin_black, shadRings);
+				float shadBlackScale	= lerp(1, shadowBlackness, attenRamp);
+				shadowBlackness			= shadBlackScale;
+				float shaBlackMix		= shadowBlackness * attenRamp;
+				float3 lightColorFinal	= lightDirect * shaBlackMix;
+				float colorIntSignal	= 0;
+				// float3 colorIntSignal	= 0;
+
+#endif
+				float3 Set_LightColor	= lightColorFinal;
+				
+				// fight how the raw light of direct + indirect overbrights
+				// Ill change this counter many times more than now. Which is to many already!
+				Set_LightColor.x	= (Set_LightColor.x > 1) ? sqrt(Set_LightColor.x) : Set_LightColor.x;
+				Set_LightColor.y	= (Set_LightColor.y > 1) ? sqrt(Set_LightColor.y) : Set_LightColor.y;
+				Set_LightColor.z	= (Set_LightColor.z > 1) ? sqrt(Set_LightColor.z) : Set_LightColor.z;
+
+
+
+				// float3 _fc_test_max		= max(Set_LightColor.r, max(Set_LightColor.g, Set_LightColor.b));
+				// float3 _fc_test_min		= min(Set_LightColor.r, min(Set_LightColor.g, Set_LightColor.b));
+				// float3 _fc_test_mix		= finalColor * pow(finalColor, 1-LinearRgbToLuminance(Set_LightColor / _fc_test_max));
+				// float3 _fc_test_mix		=  pow(Set_LightColor, 0.5 );
+				// float3 _fc_test_mix		=  sqrt(Set_LightColor);
+
+				// float3 _fc_test_mix		= GammaToLinearSpace(finalColor);
+
+				// Set_LightColor			= lerp(Set_LightColor, _fc_test_mix, _testMix);
+				// _FinalColor_var			= lerp(_FinalColor_var, _FinalColor_var * _fc_test_mix, _testMix);
+
+
+
+
+//// albedo textures
+				// is using world color
+				float3 baseColor_isLC		= lerp(attenRamp, Set_LightColor, _Is_LightColor_Base);
+				float3 shadeColor1_isLC		= lerp(attenRamp, Set_LightColor, _Is_LightColor_1st_Shade);
+				float3 shadeColor2_isLC		= lerp(attenRamp, Set_LightColor, _Is_LightColor_2nd_Shade);
+
+				// get albedo samples
+				float3 albeto_col_1			= _MainTex_var.rgb;
+				float3 albeto_col_2			= _1st_ShadeMap_var.rgb;
+				float3 albeto_col_3			= _2nd_ShadeMap_var.rgb;
+
+				// get ramp shade color mix
+				float3 ramp_world_col_1		= _Color.rgb * baseColor_isLC;
+				float3 ramp_world_col_2		= _1st_ShadeColor.rgb * shadeColor1_isLC;
+				float3 ramp_world_col_3		= _2nd_ShadeColor.rgb * shadeColor2_isLC;
+
+
+
+
+
+
 //// Lambert
 				float3 lambert_isNormalMap	= lerp( i.normalDir, normalDirection, _Is_NormalMapToBase);
 				float _HalfLambert_var		= 0.5 + 0.5 * dot( lambert_isNormalMap, lightDirection);
@@ -404,6 +532,9 @@
 //// Lambert & shadow attenuation mix
 				float4 _Set_1st_ShadePosition_var	= tex2D( _Set_1st_ShadePosition, TRANSFORM_TEX( Set_UV0, _Set_1st_ShadePosition));
 				float4 _Set_2nd_ShadePosition_var	= tex2D( _Set_2nd_ShadePosition, TRANSFORM_TEX( Set_UV0, _Set_2nd_ShadePosition));
+
+
+
 				float shade_ramp_n1		= 
 					saturate(
 						1.0 
@@ -427,43 +558,7 @@
 
 
 
-
-
-					
-//// Mix light input colors
-				//const half shadowRings			= .15;
-#ifdef _IS_PASS_FWDBASE
-				//float shadRings		= (ceil( shadowAttenB / shadowRings) * (shadowRings));
-				float3 ambientLight		= DecodeLightProbe_average( i.normalDir);
-				float shadRings			= shadowAttenB;
-				float3 lightColor		= _LightColor0.rgb;
-				float shadowBlackness	= max(_shadowCastMin_black, shadRings);
-				lightColor				= lightColor * shadowBlackness * attenRamp;
-				lightColor				= (lightColor + ambientLight) + (i.vertexLighting * i.attenVert);
-#elif _IS_PASS_FWDDELTA
-				//float shadRings		= ceil( shadowAttenB / shadowRings) * shadowRings;
-				float shadRings			= shadowAttenB;
-				float shadowBlackness	= max(_shadowCastMin_black, shadRings);
-				float3 lightColor		= _LightColor0.rgb;
-				float shadBlackScale	= lerp(1, shadowBlackness, attenRamp);
-				lightColor				= lightColor * shadBlackScale * attenRamp;
-#endif
-				float3 Set_LightColor		= lightColor;
-				float3 baseColorMultiplier	= lerp(attenRamp, Set_LightColor, _Is_LightColor_Base);
-				float3 Set_BaseColor		= _Color.rgb * _MainTex_var.rgb * baseColorMultiplier;
-
-
-
-
-
-
-				//// AO textures	
-				float4 _1st_ShadeMap_var	= tex2D( _1st_ShadeMap, TRANSFORM_TEX( Set_UV0, _1st_ShadeMap));
-				float4 _2nd_ShadeMap_var	= tex2D( _2nd_ShadeMap, TRANSFORM_TEX( Set_UV0, _2nd_ShadeMap));
-				float3 shadeColor1_isLC		= lerp(attenRamp, Set_LightColor, _Is_LightColor_1st_Shade);
-				float3 shadeColor2_isLC		= lerp(attenRamp, Set_LightColor, _Is_LightColor_2nd_Shade);
-				float3 Set_1st_ShadeColor	= _1st_ShadeColor.rgb * _1st_ShadeMap_var.rgb * shadeColor1_isLC;
-				float3 Set_2nd_ShadeColor	= _2nd_ShadeColor.rgb * _2nd_ShadeMap_var.rgb * shadeColor2_isLC;
+//// shadow1 to shadow2 mix
 				float shade_ramp_n2			=
 						saturate(
 							1.0 
@@ -475,16 +570,25 @@
 
 
 //// The 3 Shade mixer. Lerp: (base color, (shade 1, shade 2))
-				float3 _FinalColor_var		=
-					lerp(
-						Set_BaseColor
-						, lerp(
-								Set_1st_ShadeColor
-								, Set_2nd_ShadeColor
-								, shade_ramp_n2
-						)
-						, shade_ramp_n1
-					);
+				// albedo mix
+				float3 albedo_layer_23_mix		= lerp(albeto_col_2, albeto_col_3, shade_ramp_n2);
+				float3 albedo_layer_1_23_mix	= lerp(albeto_col_1, albedo_layer_23_mix, shade_ramp_n1);
+
+				// saturate albedo mix by shadows
+				// saturate logic
+				float colTest				= 1 - ((saturate( ( (shadowBlackness) + ( colorIntSignal)))));
+				float colTest2				= colTest;
+				float1 colSateOffset		= 1 + _shaSatRatio * colTest2;
+				// saturate albedo
+				float3 albedoSource			= albedo_layer_1_23_mix;
+				float3 albedo_HSV			= RGBToHSV( albedoSource);
+				float3 albedo_saturated		= HSVToRGB( float3(albedo_HSV.x, ( albedo_HSV.y * colSateOffset ), albedo_HSV.z));
+
+				// shades mix
+				float3 shade_layer_23_mix	= lerp(ramp_world_col_2, ramp_world_col_3, shade_ramp_n2);
+				float3 shade_layer_1_23_mix	= lerp(ramp_world_col_1, shade_layer_23_mix, shade_ramp_n1);
+				// combine albedo with shades.
+				float3 _FinalColor_var		= albedo_saturated * shade_layer_1_23_mix;
 
 
 
@@ -659,7 +763,7 @@
 
 
 
-//// Final Blend, (Texture & High & Rim) & Matcap & Emission
+//// Blend, (Texture & High & Rim) & Matcap & Emission
 				float3 matCap_source		= _RimLight_combine;
 				float3 matCap_isAdd			= matCap_source + _MatCap_Color * _Tweak_MatcapMaskLevel_var;
 				float3 matCap_isMulti		= 
@@ -668,39 +772,55 @@
 				float3 matCap_type			= lerp(matCap_isMulti, matCap_isAdd, _Is_BlendAddToMatCap);
 				float3 matCap_Combine		= lerp(matCap_source, matCap_type, _MatCap);
 
+
+
+//// Blend, emission
 				float3 emission_source		= matCap_Combine;
-				float3 emission_combine		= 
-					emission_source
-#ifdef _IS_PASS_FWDBASE
-					+ ( _Emissive_Tex_var.rgb * _Emissive_Color.rgb )
-#endif						
-					;
+				// float emissiveMask			= saturate(dot(_Emissive_Tex_var.rgb, 1));
+				float3 emissionMix			= (_Emissive_Tex_var.rgb * _Emissive_Color.rgb);
+#ifdef UNITY_PASS_FORWARDBASE
+				float3 emission_combine		= emission_source + emissionMix;
+#else
+				float3 emission_combine		= emission_source;
+#endif
+
+
 
 					// resolve NaN value colors.
 					float3 finalColor_source	= emission_combine;
 					float3 finalColor			= max(0, emission_combine);
 
-#ifdef _IS_CLIPPING_OFF
-//DoubleShadeWithFeather
-	#ifdef _IS_PASS_FWDBASE
-					fixed4 finalRGBA	= fixed4(finalColor,1);
-	#elif _IS_PASS_FWDDELTA
-					fixed4 finalRGBA	= fixed4(finalColor * 1,0);
-	#endif
-#elif _IS_CLIPPING_MODE
+
+
+// #ifdef _IS_CLIPPING_OFF
+// //DoubleShadeWithFeather
+// 	#ifdef UNITY_PASS_FORWARDBASE
+// 					fixed4 finalRGBA	= fixed4(finalColor,1);
+// 	#elif UNITY_PASS_FORWARDADD
+// 					fixed4 finalRGBA	= fixed4(finalColor * 1,0);
+// 	#endif
+
+#ifdef _IS_CLIPPING_MODE
 //DoubleShadeWithFeather_Clipping
-	#ifdef _IS_PASS_FWDBASE
+	#ifdef UNITY_PASS_FORWARDBASE
 					fixed4 finalRGBA	= fixed4(finalColor,1);
-	#elif _IS_PASS_FWDDELTA
+	#elif UNITY_PASS_FORWARDADD
 					fixed4 finalRGBA	= fixed4(finalColor * 1,0);
 	#endif
 #elif _IS_CLIPPING_TRANSMODE
 //DoubleShadeWithFeather_TransClipping
 					float Set_Opacity	= saturate((_Inverse_Clipping_var+_Tweak_transparency));
-	#ifdef _IS_PASS_FWDBASE
+	#ifdef UNITY_PASS_FORWARDBASE
 					fixed4 finalRGBA	= fixed4(finalColor,Set_Opacity);
-	#elif _IS_PASS_FWDDELTA
+	#elif UNITY_PASS_FORWARDADD
 					fixed4 finalRGBA	= fixed4(finalColor * Set_Opacity,0);
+	#endif
+#else	// CLIPPING OFF
+	//DoubleShadeWithFeather
+	#ifdef UNITY_PASS_FORWARDBASE
+					fixed4 finalRGBA	= fixed4(finalColor,1);
+	#elif UNITY_PASS_FORWARDADD
+					fixed4 finalRGBA	= fixed4(finalColor * 1,0);
 	#endif
 #endif
 				UNITY_APPLY_FOG(i.fogCoord, finalRGBA);
