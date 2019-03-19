@@ -533,9 +533,13 @@
 				float3 albetoCol_3		= shadeMapTex_2.rgb;
 
 				// get ramp shade color mix
-				float3 rampWorldCol_1	= _Color.rgb * baseColor_isLC;
-				float3 rampWorldCol_2	= _1st_ShadeColor.rgb * shadeColor1_isLC;
-				float3 rampWorldCol_3	= _2nd_ShadeColor.rgb * shadeColor2_isLC;
+				float3 rampWorldCol_1	= baseColor_isLC;
+				float3 rampWorldCol_2	= shadeColor1_isLC;
+				float3 rampWorldCol_3	= shadeColor2_isLC;
+
+				float3 shadeCol_1		= _Color.rgb;
+				float3 shadeCol_2		= _1st_ShadeColor.rgb;
+				float3 shadeCol_3		= _2nd_ShadeColor.rgb;
 
 
 
@@ -583,25 +587,30 @@
 
 
 //// The 3 Shade mixer. Lerp: (base color, (shade 1, shade 2))
-				// albedo mix
-				float3 albedoMix_23		= lerp(albetoCol_2, albetoCol_3, shadeRamp_n2);
-				float3 albedoMix_1_23	= lerp(albetoCol_1, albedoMix_23, shadeRamp_n1);
+				// albedo & shades mix
+				float3 satIn_1			= albetoCol_1 * shadeCol_1;
+				float3 satIn_2			= albetoCol_2 * shadeCol_2;
+				float3 satIn_3			= albetoCol_3 * shadeCol_3;
+				float3 satNoIn_1		= rampWorldCol_1;
+				float3 satNoIn_2		= rampWorldCol_2;
+				float3 satNoIn_3		= rampWorldCol_3;
 
-				// saturate albedo mix by shadows
+				// saturate mix
+				float3 satMix_23		= lerp(satIn_2, satIn_3, shadeRamp_n2);
+				float3 satMix_1_23		= lerp(satIn_1, satMix_23, shadeRamp_n1);
+				// no saturation mix
+				float3 satNoMix_23		= lerp(satNoIn_2, satNoIn_3, shadeRamp_n2);
+				float3 satNoMix_1_23	= lerp(satNoIn_1, satNoMix_23, shadeRamp_n1);
+
 				// logic
 				float colTest			= 1 - ((saturate( ( (shadowBlackness) + ( colorIntSignal)))));
-				float colTest2			= colTest;
-				float colSateOffset		= 1 + _shaSatRatio * colTest2;
-				// mix
-				float3 albedoRGBIn		= albedoMix_1_23;
+				float colSateOffset		= 1 + _shaSatRatio * colTest;
+
+				float3 albedoRGBIn		= satMix_1_23;
 				float3 albedoHSV		= RGBToHSV( albedoRGBIn);
-				float3 albedoSaturated	= HSVToRGB( float3(albedoHSV.x, ( albedoHSV.y * colSateOffset ), albedoHSV.z));
+				satMix_1_23				= HSVToRGB( float3(albedoHSV.x, ( albedoHSV.y * colSateOffset ), albedoHSV.z));
 
-				// shades mix
-				float3 shadeMix_23		= lerp(rampWorldCol_2, rampWorldCol_3, shadeRamp_n2);
-				float3 shadeMix_1_23	= lerp(rampWorldCol_1, shadeMix_23, shadeRamp_n1);
-
-				float3 shadeColor		= albedoSaturated * shadeMix_1_23;
+				float3 shadeColor		= satMix_1_23 * satNoMix_1_23;
 
 
 
