@@ -355,7 +355,7 @@
 				float3 normalMap			= UnpackNormal( tex2D( _NormalMap, TRANSFORM_TEX( i.uv, _NormalMap)));
 				float3 normalLocal			= normalMap.rgb;
 				float3x3 tangentTransform	= float3x3( i.tangent.xyz , i.biNormal.xyz, i.wNormal);
-				float3 normalDirection		= ( mul( normalLocal, tangentTransform )); // Perturbed normals
+				float3 normalDirection		= normalize( mul( normalLocal, tangentTransform ));
 
 
 
