@@ -1,27 +1,33 @@
 ﻿// UCTS_Outline.cginc
 // Forked from Unity-Chan Toon Shader Ver.2.0.4
 // Modifications by ACiiL.
+// https://github.com/ACIIL/UnityChanToonShaderVer2_Project
+// Source:
+// https://github.com/unity3d-jp/UnityChanToonShaderVer2_Project
 //
-			uniform float4 _Color;
 			uniform sampler2D _MainTex; uniform float4 _MainTex_ST;
-			uniform float _Outline_Width;
-			uniform float _Farthest_Distance;
-			uniform float _Nearest_Distance;
 			uniform sampler2D _Outline_Sampler; uniform float4 _Outline_Sampler_ST;
-			uniform float4 _Outline_Color;
-			uniform fixed _Is_BlendBaseColor;
-			uniform fixed _Is_LightColor_Base;
-			uniform float _Offset_Z;
 			uniform sampler2D _OutlineTex; uniform float4 _OutlineTex_ST;
-			uniform fixed _Is_OutlineTex;
-			uniform float _OutlineshadowCastMin_black;
+
+			uniform float4 _Color;
+			uniform float4 _Outline_Color;
+
+			uniform half _Outline_Width;
+			uniform half _Farthest_Distance;
+			uniform half _Nearest_Distance;
+			uniform half _Is_BlendBaseColor;
+			uniform half _Is_LightColor_Base;
+			uniform half _Offset_Z;
+			uniform half _Is_OutlineTex;
+			uniform half _OutlineshadowCastMin_black;
+
 #ifdef _IS_OUTLINE_CLIPPING_YES
 			uniform sampler2D _ClippingMask; uniform float4 _ClippingMask_ST;
-			uniform float _Clipping_Level;
-			uniform fixed _Inverse_Clipping;
-			uniform fixed _IsBaseMapAlphaAsClippingMask;
+			uniform half _Clipping_Level;
+			uniform half _Inverse_Clipping;
+			uniform half _IsBaseMapAlphaAsClippingMask;
 #endif
-			uniform int _outline_mode;
+			uniform half _outline_mode;
 			static const float softGI = .5;
 
 
@@ -242,12 +248,13 @@
 				float3 Set_BaseColor			= lerp( _BaseColorMap_var * Set_LightColor, (_BaseColorMap_var * Set_LightColor.rgb), _Is_LightColor_Base );			
 				float3 _Is_BlendBaseColor_var	= lerp( (_Outline_Color.rgb * Set_LightColor.rgb), (_Outline_Color.rgb * Set_BaseColor), _Is_BlendBaseColor );
 				float3 _OutlineTex_var			= tex2D( _OutlineTex, TRANSFORM_TEX( Set_UV0, _OutlineTex));
-#ifdef _IS_OUTLINE_CLIPPING_NO
-				float3 Set_Outline_Color		= lerp( _Is_BlendBaseColor_var, _OutlineTex_var.rgb * _Is_BlendBaseColor_var, _Is_OutlineTex );
-				UNITY_APPLY_FOG( i.fogCoord, Set_Outline_Color);
-				return fixed4(Set_Outline_Color, 1);
+// #ifdef _IS_OUTLINE_CLIPPING_NO
+// 				float3 Set_Outline_Color		= lerp( _Is_BlendBaseColor_var, _OutlineTex_var.rgb * _Is_BlendBaseColor_var, _Is_OutlineTex );
+// 				UNITY_APPLY_FOG( i.fogCoord, Set_Outline_Color);
+// 				return fixed4(Set_Outline_Color, 1);
 
-#elif _IS_OUTLINE_CLIPPING_YES
+// #elif _IS_OUTLINE_CLIPPING_YES
+#ifdef _IS_OUTLINE_CLIPPING_YES
 				float4 _ClippingMask_var				= tex2D( _ClippingMask, TRANSFORM_TEX( Set_UV0, _ClippingMask));
 				float Set_MainTexAlpha					= _MainTex_var.a;
 				float _IsBaseMapAlphaAsClippingMask_var	= lerp( _ClippingMask_var.r, Set_MainTexAlpha, _IsBaseMapAlphaAsClippingMask );
@@ -262,5 +269,9 @@
 					);
 				UNITY_APPLY_FOG( i.fogCoord, Set_Outline_Color);
 				return Set_Outline_Color;
+#else
+				float3 Set_Outline_Color		= lerp( _Is_BlendBaseColor_var, _OutlineTex_var.rgb * _Is_BlendBaseColor_var, _Is_OutlineTex );
+				UNITY_APPLY_FOG( i.fogCoord, Set_Outline_Color);
+				return fixed4(Set_Outline_Color, 1);
 #endif
 			}
