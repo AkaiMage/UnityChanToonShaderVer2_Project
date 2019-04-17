@@ -2,6 +2,7 @@
 	Properties {
 		[Enum(OFF,0,FRONT,1,BACK,2)] _CullMode	("Cull Mode", int)	= 2  //OFF/FRONT/BACK
 
+		// _testMix	("test mix", Range(0, 1))	= 1
 
 
 		[Space(25)]
