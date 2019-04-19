@@ -386,8 +386,9 @@
 
 //// frag
 			float4 frag(VertexOutput i, bool frontFace : SV_IsFrontFace ) : SV_TARGET {
+				float faceDetect			= !frontFace ^ IsInMirror();
 				i.wNormal					= normalize( i.wNormal);
-				if(!frontFace ^ IsInMirror()) { // flip normal for back faces.
+				if(faceDetect) { // flip normal for back faces.
 					i.wNormal = -i.wNormal;
 				}
 				i.biNormal					= ( i.biNormal);
@@ -407,7 +408,7 @@
 				float3 viewLightDirection	= normalize( UNITY_MATRIX_V[2].xyz + UNITY_MATRIX_V[1].xyz);
 				float3 lightDir				= normalize( _WorldSpaceLightPos0.xyz + (i.GIdirection) * .01 + viewLightDirection *.0001);
 #elif UNITY_PASS_FORWARDADD
-				float3 lightDir	= 
+				float3 lightDir				= 
 					normalize( 
 						lerp( 
 							_WorldSpaceLightPos0.xyz
@@ -415,6 +416,10 @@
 							, _WorldSpaceLightPos0.w)
 					);
 #endif
+				if (faceDetect)
+				{
+					lightDir	= -lightDir;
+				}
 
 
 
@@ -442,13 +447,25 @@
 				// float4 mainTex			= tex2D( _MainTex, TRANSFORM_TEX( i.uv, _MainTex));
 				float4 mainTex			= UNITY_SAMPLE_TEX2D( _MainTex, TRANSFORM_TEX( i.uv, _MainTex));
 
+
+
 				// clip & alpha handling. Here now so clip() may interrupt flow.
+#ifndef NotAlpha
 				float4 clipMask			= UNITY_SAMPLE_TEX2D_SAMPLER( _ClippingMask, _Set_HighColorMask, TRANSFORM_TEX(i.uv, _ClippingMask));
-				float mainTexAlpha		= mainTex.a;
-				float useMainTexAlpha	= lerp( clipMask.r, mainTexAlpha, _IsBaseMapAlphaAsClippingMask );
-				float inverseClipping	= lerp( useMainTexAlpha, (1.0 - useMainTexAlpha), _Inverse_Clipping );
-				float clipTest			= saturate( (inverseClipping + _Clipping_Level));
-				clip(clipTest - 0.5);
+				float useMainTexAlpha	= lerp( clipMask.r, mainTex.a, _IsBaseMapAlphaAsClippingMask );
+				float alpha				= lerp( useMainTexAlpha, (1.0 - useMainTexAlpha), _Inverse_Clipping );
+
+				float clipTest			=  (( -_Clipping_Level * 1.01 + alpha));
+				clip(clipTest);
+
+				alpha					= saturate(( alpha + _Tweak_transparency));
+	#ifdef IsClip
+				alpha		= 1;
+	#endif
+#else
+				float alpha		= 1;
+#endif
+
 
 				float4 shadeMapTex_1	= UNITY_SAMPLE_TEX2D_SAMPLER( _1st_ShadeMap, _MainTex, TRANSFORM_TEX( i.uv, _1st_ShadeMap));
 				float4 shadeMapTex_2	= UNITY_SAMPLE_TEX2D_SAMPLER( _2nd_ShadeMap, _MainTex, TRANSFORM_TEX( i.uv, _2nd_ShadeMap));
@@ -936,20 +953,21 @@
 
 
 
-					// resolve NaN value colors.
-					float3 finalColorIn	= emissionOut;
-					float3 finalColor	= max(0, finalColorIn);
-					
-					// debug
-					// finalColor	= finalColor*.001+float4(rimColSource.xyz, 1);
+				// resolve NaN value colors.
+				float3 finalColorIn	= emissionOut;
+				float3 finalColor	= max(0, finalColorIn);
+				
+				// debug
+				// finalColor	= finalColor*.001+float4(rimColSource.xyz, 1);
 
 
-					float Set_Opacity	= saturate((inverseClipping + _Tweak_transparency));
+
 #ifdef UNITY_PASS_FORWARDBASE
-					fixed4 finalRGBA	= fixed4(finalColor, Set_Opacity);
+				fixed4 finalRGBA	= fixed4(finalColor, alpha);
 #elif UNITY_PASS_FORWARDADD
-					fixed4 finalRGBA	= fixed4(finalColor * Set_Opacity, 0);
+				fixed4 finalRGBA	= fixed4(finalColor * alpha, 0);
 #endif
+				// fixed4 finalRGBA	= fixed4(finalColor, alpha);
 
 				UNITY_APPLY_FOG(i.fogCoord, finalRGBA);
 				return finalRGBA;

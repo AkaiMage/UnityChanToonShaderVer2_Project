@@ -8,7 +8,9 @@
 			uniform sampler2D _ClippingMask; uniform float4 _ClippingMask_ST;
 			uniform sampler2D _MainTex; uniform float4 _MainTex_ST;
 
+			uniform half _DetachShadowClipping;
 			uniform half _Clipping_Level;
+			uniform half _Clipping_Level_Shadow;
 			uniform half _Inverse_Clipping;
 			uniform half _IsBaseMapAlphaAsClippingMask;
 
@@ -48,13 +50,19 @@
 
 
 			float4 frag(VertexOutput i) : SV_TARGET {
-				float2 Set_UV0					= i.uv0;
-				float4 _ClippingMask_var		= tex2D(_ClippingMask,TRANSFORM_TEX(Set_UV0, _ClippingMask));
-				float4 _MainTex_var				= tex2D(_MainTex,TRANSFORM_TEX(Set_UV0, _MainTex));
-				float Set_MainTexAlpha			= _MainTex_var.a;
-				float _IsBaseMapAlphaAsClippingMask_var	= lerp( _ClippingMask_var.r, Set_MainTexAlpha, _IsBaseMapAlphaAsClippingMask );
-				float _Inverse_Clipping_var		= lerp( _IsBaseMapAlphaAsClippingMask_var, (1.0 - _IsBaseMapAlphaAsClippingMask_var), _Inverse_Clipping );
-				float Set_Clipping				= saturate((_Inverse_Clipping_var + _Clipping_Level));
-				clip(Set_Clipping - 0.5);
+#ifndef NotAlpha
+				float2 Set_UV0			= i.uv0;
+				float4 clippingMaskTex	= tex2D(_ClippingMask,TRANSFORM_TEX(Set_UV0, _ClippingMask));
+				float4 mainTex			= tex2D(_MainTex, TRANSFORM_TEX(Set_UV0, _MainTex));
+				float useMainTexAlpha	= lerp( clippingMaskTex.r, mainTex.a, _IsBaseMapAlphaAsClippingMask );
+				float alpha				= lerp( useMainTexAlpha, (1.0 - useMainTexAlpha), _Inverse_Clipping );
+
+				float clipTest			= (_DetachShadowClipping) ? _Clipping_Level_Shadow : _Clipping_Level;
+				clipTest				= (( -clipTest * 1.01 + alpha));
+				clip(clipTest);
+				
 				SHADOW_CASTER_FRAGMENT(i)
+#else
+				SHADOW_CASTER_FRAGMENT(i)
+#endif
 			}

@@ -6,12 +6,14 @@
 
 		[Space(25)]
 		[Header(Alpha mask)]
-		_ClippingMask		("Clipping mask", 2D)					= "white" {}
-		_Clipping_Level		("Clipping level", Range(0, 1))			= 0
-		_Tweak_transparency	("Tweak transparency", Range(-1, 1))	= 0
+		_ClippingMask	("Clipping mask", 2D)								= "white" {}
+		_Clipping_Level	("Clipping level", Range(0, 1))						= 0 
+		_Tweak_transparency	("Tweak transparency", Range(-1, 1))			= 0
 		[Toggle(_)]_IsBaseMapAlphaAsClippingMask	("Use main texture Alpha", Float )	= 0
 		[Toggle(_)]_Inverse_Clipping				("Inverse clipping", Float )		= 0
-		[Enum(Off,0,On,1)] _ZWrite	("Z Write. Depth write", Int)						= 1
+		[Toggle(_)]_DetachShadowClipping	("Separate Shadow Clipping", Float)	= 0
+		_Clipping_Level_Shadow	("Shadow Clipping level", Range(0, 1))			= 1
+		[Enum(Off,0,On,1)] _ZWrite	("Z Write. Depth write", Int)				= 1
 
 
 
@@ -205,6 +207,7 @@
 			#pragma multi_compile_fwdbase_fullshadows
 			#pragma multi_compile_fog
 			#pragma multi_compile UNITY_PASS_FORWARDBASE
+			#define NotAlpha
 			#include "UCTS_DoubleShadeWithFeather.cginc"
 			ENDCG
 		}
@@ -241,6 +244,7 @@
 			#pragma multi_compile_fwdadd_fullshadows
 			#pragma multi_compile_fog
 			#pragma multi_compile UNITY_PASS_FORWARDADD
+			#define NotAlpha
 			#include "UCTS_DoubleShadeWithFeather.cginc"
 			ENDCG
 		}
@@ -277,6 +281,7 @@
 			#pragma multi_compile_fwdbase_fullshadows
 			#pragma multi_compile_fog
 			#pragma multi_compile UNITY_PASS_FORWARDBASE
+			#define NotAlpha
 			#include "UCTS_Outline.cginc"
 			ENDCG
 		}
@@ -314,6 +319,7 @@
 			#pragma multi_compile_fwdadd_fullshadows
 			#pragma multi_compile_fog
 			#pragma multi_compile UNITY_PASS_FORWARDADD
+			#define NotAlpha
 			#include "UCTS_Outline.cginc"
 			ENDCG
 		}
@@ -335,6 +341,7 @@
 			#include "Lighting.cginc"
 			#pragma fragmentoption ARB_precision_hint_fastest
 			#pragma multi_compile_shadowcaster
+			#define NotAlpha
 			#include "UCTS_ShadowCaster.cginc"
 			ENDCG
 		}
