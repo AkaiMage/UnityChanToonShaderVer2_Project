@@ -175,6 +175,8 @@
 			"Queue"="AlphaTest+50"
 			"RenderType"="TransparentCutout"
 		}
+		AlphaToMask on
+		// AlphaToMask off
 
 
 
@@ -220,7 +222,8 @@
 			Tags {
 				"LightMode" = "ForwardAdd" 
 			}
-			Blend One One
+			// Blend One One
+			Blend SrcAlpha One
 			Cull front
 			ZTest [_ZTest]
 			ZWrite [_ZWrite]
@@ -294,7 +297,8 @@
 				"LightMode"="ForwardAdd"
 			}
 			Cull[_CullMode]
-			Blend One One
+			// Blend One One
+			Blend SrcAlpha One
 			ZTest [_ZTest]
 			ZWrite [_ZWrite]
 
@@ -329,7 +333,9 @@
 			Tags {
 				"LightMode"="ShadowCaster"
 			}
+			AlphaToMask Off
 			Offset 1, 1
+			// Cull[_CullMode]
 			// Cull off
 			// Zwrite Off
 			
@@ -340,6 +346,7 @@
 			#include "Lighting.cginc"
 			#pragma fragmentoption ARB_precision_hint_fastest
 			#pragma multi_compile_shadowcaster
+			#define Dither
 			#include "UCTS_ShadowCaster.cginc"
 			ENDCG
 		}

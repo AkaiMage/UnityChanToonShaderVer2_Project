@@ -24,6 +24,7 @@
 #ifdef _IS_OUTLINE_CLIPPING_YES
 			uniform sampler2D _ClippingMask; uniform float4 _ClippingMask_ST;
 			uniform half _Clipping_Level;
+			uniform half _Tweak_transparency;
 			uniform half _Inverse_Clipping;
 			uniform half _IsBaseMapAlphaAsClippingMask;
 #endif
@@ -256,8 +257,9 @@
 				float useMainTexAlpha	= lerp( clippingMaskTex.r,  _MainTex_var.a, _IsBaseMapAlphaAsClippingMask );
 				float alpha				= lerp( useMainTexAlpha, (1.0 - useMainTexAlpha), _Inverse_Clipping );
 
-				float clipTest			= (( -_Clipping_Level * 1.01 + alpha));
+				float clipTest			= (( alpha - _Clipping_Level - 0.01));
 				clip(clipTest);
+				alpha				= saturate(alpha + _Tweak_transparency);
 	#ifdef IsClip
 				alpha	= 1;
 	#endif
