@@ -7,7 +7,7 @@
 // Coding goal is both as a personal study to self improve shader writing and make UTS2 redundant and compatible 
 // in all typical vrchat map scene light situations.
 //
-			// sample sets: normals, masks, albedos, AOs, matcap, emissionColor
+			// sample sets: normals, albedo(shades/masks), AOs, matcap, emissionColor
 			UNITY_DECLARE_TEX2D_NOSAMPLER(_ClippingMask); uniform float4 _ClippingMask_ST;
 
 			UNITY_DECLARE_TEX2D(_NormalMap); uniform float4 _NormalMap_ST;
@@ -20,7 +20,7 @@
 			UNITY_DECLARE_TEX2D_NOSAMPLER(_Set_2nd_ShadePosition); uniform float4 _Set_2nd_ShadePosition_ST;
 
 			UNITY_DECLARE_TEX2D_NOSAMPLER(_HighColor_Tex); uniform float4 _HighColor_Tex_ST;
-			UNITY_DECLARE_TEX2D(_Set_HighColorMask); uniform float4 _Set_HighColorMask_ST;
+			UNITY_DECLARE_TEX2D_NOSAMPLER(_Set_HighColorMask); uniform float4 _Set_HighColorMask_ST;
 			
 			UNITY_DECLARE_TEX2D_NOSAMPLER(_Set_RimLightMask); uniform float4 _Set_RimLightMask_ST;
 			
@@ -327,7 +327,8 @@
 
 
 //// vert			
-			VertexOutput vert (VertexInput v) {
+			VertexOutput vert (VertexInput v) 
+			{
 				VertexOutput o = (VertexOutput)0;
 				o.pos			= UnityObjectToClipPos( v.vertex );
 				o.worldPos		= mul( unity_ObjectToWorld, v.vertex);
@@ -368,7 +369,8 @@
 //// frag
 			float4 frag(
 				VertexOutput i
-				, bool frontFace : SV_IsFrontFace ) : SV_TARGET {
+				, bool frontFace : SV_IsFrontFace ) : SV_TARGET 
+			{
 				float faceDetect			= !frontFace ^ IsInMirror();
 				i.wNormal					= normalize( i.wNormal);
 				if(faceDetect) { // flip normal for back faces.
@@ -438,7 +440,7 @@
 
 				// clip & alpha handling. Here now so clip() may interrupt flow.
 #ifndef NotAlpha
-				float4 clipMask			= UNITY_SAMPLE_TEX2D_SAMPLER( _ClippingMask, _Set_HighColorMask, TRANSFORM_TEX(i.uv, _ClippingMask));
+				float4 clipMask			= UNITY_SAMPLE_TEX2D_SAMPLER( _ClippingMask, _MainTex, TRANSFORM_TEX(i.uv, _ClippingMask));
 				float useMainTexAlpha	= lerp( clipMask.r, mainTex.a, _IsBaseMapAlphaAsClippingMask );
 				float alpha				= lerp( useMainTexAlpha, (1.0 - useMainTexAlpha), _Inverse_Clipping );
 
@@ -715,7 +717,7 @@
 
 //// High Color. Specular.
 				float4 highColorTex			= UNITY_SAMPLE_TEX2D_SAMPLER( _HighColor_Tex, _MainTex, TRANSFORM_TEX( i.uv, _HighColor_Tex));
-				float4 highColorMask		= UNITY_SAMPLE_TEX2D( _Set_HighColorMask, TRANSFORM_TEX( i.uv, _Set_HighColorMask));
+				float4 highColorMask		= UNITY_SAMPLE_TEX2D_SAMPLER( _Set_HighColorMask, _MainTex, TRANSFORM_TEX( i.uv, _Set_HighColorMask));
 				if (_highColTexSource)	{ highColorTex	= mainTex;}
 
 				
@@ -784,7 +786,7 @@
 				rimlightMaskSetup		= saturate(rimlightMaskSetup);
 				rimlightApMaskSetup		= saturate( rimlightApMaskSetup);
 
-				float4 rimLightMaskTex		= UNITY_SAMPLE_TEX2D_SAMPLER( _Set_RimLightMask, _Set_HighColorMask, TRANSFORM_TEX( i.uv, _Set_RimLightMask));
+				float4 rimLightMaskTex		= UNITY_SAMPLE_TEX2D_SAMPLER( _Set_RimLightMask, _MainTex, TRANSFORM_TEX( i.uv, _Set_RimLightMask));
 				float rimLightTexMask		= saturate( rimLightMaskTex.g + _Tweak_RimLightMaskLevel);
 				// float rimlightMaskToward	= saturate( rimlightMaskSetup - ((1.0 - ndotl_pure) + _Tweak_LightDirection_MaskLevel));
 				float rimlightMaskToward	= saturate( rimlightMaskSetup + (ndotl_pure - 1.0 - _Tweak_LightDirection_MaskLevel));
@@ -881,7 +883,7 @@
 						, matCapMix * (1 + shadeRamp_n1 * (_TweakMatCapOnShadow - 1))
 						, _Is_UseTweakMatCapOnShadow
 					);
-				float4 matcapMaskTex	= UNITY_SAMPLE_TEX2D_SAMPLER(_Set_MatcapMask, _Set_HighColorMask, TRANSFORM_TEX(i.uv, _Set_MatcapMask));
+				float4 matcapMaskTex	= UNITY_SAMPLE_TEX2D_SAMPLER(_Set_MatcapMask, _MainTex, TRANSFORM_TEX(i.uv, _Set_MatcapMask));
 				float matcapMaskTweak	= saturate(matcapMaskTex.g + _Tweak_MatcapMaskLevel);
 
 
@@ -890,7 +892,7 @@
 
 
 //// Emission
-				float4 emissiveMask		= UNITY_SAMPLE_TEX2D_SAMPLER( _Emissive_Tex, _Set_HighColorMask, TRANSFORM_TEX( i.uv, _Emissive_Tex));
+				float4 emissiveMask		= UNITY_SAMPLE_TEX2D_SAMPLER( _Emissive_Tex, _MainTex, TRANSFORM_TEX( i.uv, _Emissive_Tex));
 				float4 emissionColor	= UNITY_SAMPLE_TEX2D( _EmissionColorTex, TRANSFORM_TEX( i.uv, _Emissive_Tex));
 
 
