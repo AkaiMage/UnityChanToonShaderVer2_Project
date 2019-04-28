@@ -462,8 +462,10 @@
 				alpha					= clipTest;
 				// float alpha2			= saturate(alpha * alpha);
 				float dither			= tex3D(_DitherMaskLOD, float3(screenUV.xy * .25, alpha * .99), 0,0).a;
-				float amix				= lerp(dither, alpha + dither, alpha);
-				alpha					= amix;
+				// float amix				= lerp(dither, 0.5*dither+alpha, alpha);
+				// float amix				= 0.5*dither + alpha;
+				alpha					= dither;
+				clip(alpha -1);
 				alpha					= saturate(alpha);
 				// testVar					= float4(dither.xxx,1);
 
@@ -572,7 +574,8 @@
 				float shadRings			= shadowAttenB;
 				float3 lightIndirect	= DecodeLightProbe_average();
 				float3 lightDirect		= _LightColor0.rgb;
-				float shadowBlackness	= max(_shadowCastMin_black, shadRings);
+				float shadowBlackness	= saturate(_shadowCastMin_black + shadRings);
+				// float shadowBlackness	= max(_shadowCastMin_black, shadRings);
 				float shaBlackMix		= shadowBlackness * attenRamp;
 				lightDirect				= lightDirect * shaBlackMix;
 
@@ -587,7 +590,8 @@
 				float shadRings			= shadowAttenB;
 				float3 lightIndirect	= 1;
 				float3 lightDirect		= _LightColor0.rgb;
-				float shadowBlackness	= max(_shadowCastMin_black, shadRings);
+				float shadowBlackness	= saturate(_shadowCastMin_black + shadRings);
+				// float shadowBlackness	= max(_shadowCastMin_black, shadRings);
 				float shadBlackScale	= lerp(1, shadowBlackness, attenRamp);
 				shadowBlackness			= shadBlackScale;
 				float shaBlackMix		= shadowBlackness * attenRamp;
