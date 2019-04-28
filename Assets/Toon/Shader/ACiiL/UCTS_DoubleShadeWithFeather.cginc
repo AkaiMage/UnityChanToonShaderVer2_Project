@@ -574,7 +574,8 @@
 				float shadRings			= shadowAttenB;
 				float3 lightIndirect	= DecodeLightProbe_average();
 				float3 lightDirect		= _LightColor0.rgb;
-				float shadowBlackness	= saturate(_shadowCastMin_black + shadRings);
+				float shadowBlackness	= saturate( (shadRings+_shadowCastMin_black)/(1-_shadowCastMin_black) );
+				// float shadowBlackness	= saturate(_shadowCastMin_black + shadRings);
 				// float shadowBlackness	= max(_shadowCastMin_black, shadRings);
 				float shaBlackMix		= shadowBlackness * attenRamp;
 				lightDirect				= lightDirect * shaBlackMix;
@@ -590,7 +591,7 @@
 				float shadRings			= shadowAttenB;
 				float3 lightIndirect	= 1;
 				float3 lightDirect		= _LightColor0.rgb;
-				float shadowBlackness	= saturate(_shadowCastMin_black + shadRings);
+				float shadowBlackness	= saturate( (shadRings+_shadowCastMin_black)/(1-_shadowCastMin_black) );
 				// float shadowBlackness	= max(_shadowCastMin_black, shadRings);
 				float shadBlackScale	= lerp(1, shadowBlackness, attenRamp);
 				shadowBlackness			= shadBlackScale;
