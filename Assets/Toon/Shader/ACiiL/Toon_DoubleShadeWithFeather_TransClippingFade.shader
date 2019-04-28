@@ -336,7 +336,7 @@
 			AlphaToMask Off
 			Offset 1, 1
 			// Cull[_CullMode]
-			// Cull off
+			Cull off
 			// Zwrite Off
 			
 			CGPROGRAM
