@@ -448,7 +448,8 @@
 				clip(clipTest);
 
 	#ifndef IsClip
-				// // dither pattern with some a2c blending.
+				// dither pattern with some a2c blending.
+				// citation to Silent and Xiexe for guidance and research documentation.
 				clipTest				= saturate(( alpha + _Tweak_transparency));
 				float4 screenPos		= i.screenPos;
 				float4 screenUV			= screenPos / (screenPos.w + 0.00001);
