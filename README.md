@@ -286,7 +286,7 @@ Is you model pure black when you apply UTS2 ? Default your model import settings
 
 
 # Support credits to:
-Noe, TCL, June, Cubed, Silent, RetroGeo, Xiexe, Mel0n, Cibbi, Hakanai, Neitri, 1001, Kaj, Error.mdl, more; and many misc shader posts among google/blogs/stack exchange/twitter/discords i cannot remember them all.
+Noe, TCL, June, Cubed, Silent, RetroGeo, Xiexe, Mel0n, Cibbi, Hakanai, Neitri, 1001, Kaj, Error.mdl, d4rkpl4y3r, more; and many misc shader posts among google/blogs/stack exchange/twitter/discords i cannot remember them all.
 
 
 
